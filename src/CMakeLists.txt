@@ -9,6 +9,32 @@ set(CMAKE_ARGS
     "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
 )
 
+# External projects configure themselves and would otherwise rediscover cl.exe.
+# Forward the compiler selected for this build so clang-cl (and any other
+# explicit compiler) is used for the dependencies as well.
+if(NOT CMAKE_GENERATOR MATCHES "Visual Studio")
+    list(APPEND CMAKE_ARGS
+        "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+        "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+    )
+    if(CMAKE_RC_COMPILER)
+        list(APPEND CMAKE_ARGS "-DCMAKE_RC_COMPILER=${CMAKE_RC_COMPILER}")
+    endif()
+    if(CMAKE_LINKER)
+        list(APPEND CMAKE_ARGS "-DCMAKE_LINKER=${CMAKE_LINKER}")
+    endif()
+endif()
+
+# The Visual Studio generator selects clang-cl through the ClangCL toolset
+# rather than CMAKE_CXX_COMPILER. Pass that toolset through to each external project.
+set(EXTERNAL_PROJECT_GENERATOR_ARGS "")
+if(CMAKE_GENERATOR_PLATFORM)
+    list(APPEND EXTERNAL_PROJECT_GENERATOR_ARGS CMAKE_GENERATOR_PLATFORM "${CMAKE_GENERATOR_PLATFORM}")
+endif()
+if(CMAKE_GENERATOR_TOOLSET)
+    list(APPEND EXTERNAL_PROJECT_GENERATOR_ARGS CMAKE_GENERATOR_TOOLSET "${CMAKE_GENERATOR_TOOLSET}")
+endif()
+
 include(check_git_submodule.cmake)
 
 check_git_submodule(dechamps_CMakeUtils)
@@ -16,6 +42,7 @@ check_git_submodule(dechamps_CMakeUtils)
 check_git_submodule(tinytoml)
 ExternalProject_Add(
     tinytoml
+    ${EXTERNAL_PROJECT_GENERATOR_ARGS}
     SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/tinytoml"
     INSTALL_DIR "${INTERNAL_INSTALL_PREFIX}"
     CONFIGURE_COMMAND ""
@@ -27,6 +54,7 @@ ExternalProject_Add(
 check_git_submodule(cxxopts)
 ExternalProject_Add(
     cxxopts
+    ${EXTERNAL_PROJECT_GENERATOR_ARGS}
     SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/cxxopts"
     INSTALL_DIR "${INTERNAL_INSTALL_PREFIX}"
     CMAKE_ARGS ${CMAKE_ARGS}
@@ -37,6 +65,7 @@ ExternalProject_Add(
 check_git_submodule(libsndfile)
 ExternalProject_Add(
     libsndfile
+    ${EXTERNAL_PROJECT_GENERATOR_ARGS}
     SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/libsndfile"
     INSTALL_DIR "${INTERNAL_INSTALL_PREFIX}"
     CMAKE_ARGS ${CMAKE_ARGS} -DBUILD_PROGRAMS=OFF -DBUILD_SHARED_LIBS=ON
@@ -47,6 +76,7 @@ ExternalProject_Add(
 check_git_submodule(portaudio)
 ExternalProject_Add(
     portaudio
+    ${EXTERNAL_PROJECT_GENERATOR_ARGS}
     SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/portaudio"
     INSTALL_DIR "${INTERNAL_INSTALL_PREFIX}"
     BUILD_ALWAYS TRUE USES_TERMINAL_BUILD TRUE
@@ -63,6 +93,7 @@ ExternalProject_Add(
 check_git_submodule(dechamps_cpputil)
 ExternalProject_Add(
     dechamps_cpputil
+    ${EXTERNAL_PROJECT_GENERATOR_ARGS}
     SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/dechamps_cpputil"
     BUILD_ALWAYS TRUE USES_TERMINAL_BUILD TRUE
     INSTALL_DIR "${INTERNAL_INSTALL_PREFIX}"
@@ -73,6 +104,7 @@ ExternalProject_Add(
 check_git_submodule(dechamps_cpplog)
 ExternalProject_Add(
     dechamps_cpplog
+    ${EXTERNAL_PROJECT_GENERATOR_ARGS}
     SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/dechamps_cpplog"
     BUILD_ALWAYS TRUE USES_TERMINAL_BUILD TRUE
     INSTALL_DIR "${INTERNAL_INSTALL_PREFIX}"
@@ -83,6 +115,7 @@ ExternalProject_Add(
 check_git_submodule(dechamps_ASIOUtil)
 ExternalProject_Add(
     dechamps_ASIOUtil
+    ${EXTERNAL_PROJECT_GENERATOR_ARGS}
     SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/dechamps_ASIOUtil"
     USES_TERMINAL_CONFIGURE TRUE
     BUILD_ALWAYS TRUE USES_TERMINAL_BUILD TRUE
@@ -95,6 +128,7 @@ ExternalProject_Add(
 check_git_submodule(ASIOTest)
 ExternalProject_Add(
     ASIOTest
+    ${EXTERNAL_PROJECT_GENERATOR_ARGS}
     SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/ASIOTest"
     BUILD_ALWAYS TRUE USES_TERMINAL_BUILD TRUE
     INSTALL_DIR "${INTERNAL_INSTALL_PREFIX}"
@@ -105,6 +139,7 @@ ExternalProject_Add(
 
 ExternalProject_Add(
     FlexASIO
+    ${EXTERNAL_PROJECT_GENERATOR_ARGS}
     SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/flexasio"
     BUILD_ALWAYS TRUE USES_TERMINAL_BUILD TRUE
     INSTALL_DIR "${INTERNAL_INSTALL_PREFIX}"

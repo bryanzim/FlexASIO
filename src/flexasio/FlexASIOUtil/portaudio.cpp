@@ -220,13 +220,13 @@ namespace flexasio {
 	}
 
 	WAVEFORMATEXTENSIBLE GetWasapiDeviceDefaultFormat(PaDeviceIndex index) {
-		WAVEFORMATEXTENSIBLE format = { 0 };
+		WAVEFORMATEXTENSIBLE format {};
 		const auto result = PaWasapi_GetDeviceDefaultFormat(&format, sizeof(format), index);
 		if (result <= 0) throw std::runtime_error(std::string("Unable to get WASAPI device default format for device ") + std::to_string(index) + ": " + Pa_GetErrorText(result));
 		return format;
 	}
 	WAVEFORMATEXTENSIBLE GetWasapiDeviceMixFormat(PaDeviceIndex index) {
-		WAVEFORMATEXTENSIBLE format = { 0 };
+		WAVEFORMATEXTENSIBLE format {};
 		const auto result = PaWasapi_GetDeviceMixFormat(&format, sizeof(format), index);
 		if (result <= 0) throw std::runtime_error(std::string("Unable to get WASAPI device mix format for device ") + std::to_string(index) + ": " + Pa_GetErrorText(result));
 		return format;
@@ -277,7 +277,7 @@ namespace flexasio {
 			}, [](const GUID& guid) {
 			char str[128];
 			// Shamelessly stolen from https://stackoverflow.com/a/18555932/172594
-			snprintf(str, sizeof(str), "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}", guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
+			snprintf(str, sizeof(str), "{%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}", guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
 			return std::string(str);
 		});
 	}
@@ -319,8 +319,8 @@ namespace flexasio {
 				const auto wasapiSpecific = static_cast<const PaWasapiStreamInfo*>(parameters.hostApiSpecificStreamInfo);
 				result << ", WASAPI specific: flags " << GetWasapiFlagsString(PaWasapiFlags(wasapiSpecific->flags)) << ", channel mask "
 					<< GetWaveFormatChannelMaskString(wasapiSpecific->channelMask) << ", host processor output "
-					<< wasapiSpecific->hostProcessorOutput << ", host processor input "
-					<< wasapiSpecific->hostProcessorInput << ", thread priority "
+					<< reinterpret_cast<const void*>(wasapiSpecific->hostProcessorOutput) << ", host processor input "
+					<< reinterpret_cast<const void*>(wasapiSpecific->hostProcessorInput) << ", thread priority "
 					<< GetWasapiThreadPriorityString(wasapiSpecific->threadPriority) << ", stream category "
 					<< GetWasapiStreamCategoryString(wasapiSpecific->streamCategory) << ", stream option "
 					<< GetWasapiStreamOptionString(wasapiSpecific->streamOption);
