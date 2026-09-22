@@ -69,8 +69,8 @@ pipeline. In particular, choice of backend can affect:
   backends.
 
 **Note:** the internal buffer size of the shared Windows audio pipeline has been
-observed to be 20 ms. This means that only exclusive backends (i.e. WASAPI
-Exclusive, WDM-KS) can achieve an actual latency below 20 ms.
+observed to be 10 ms. This means that only exclusive backends (i.e. WASAPI
+Exclusive, WDM-KS) can achieve an actual latency below 10 ms.
 
 **Note:** In addition to APOs, hardware devices can also implement additional
 audio processing at a low level in the audio driver, or baked into the hardware
@@ -99,7 +99,7 @@ the fact that MME appears to [behave very poorly][issue30] with small buffer
 sizes.
 
 Latency numbers reported by MME do not seem to take the Windows audio pipeline
-into account. This means the reported latency is underestimated by at least 20
+into account. This means the reported latency is underestimated by at least 10
 ms, if not more.
 
 The MME backend exposes "virtual" devices called *"Microsoft Sound Mapper -
@@ -128,6 +128,7 @@ Windows pipeline, converting as necessary.
 One would expect latency to be somewhat better than MME, though it's not clear
 if that's really the case in practice. The DirectSound backend has been observed
 to [behave very poorly][issue29] with small buffer sizes on the input side,
+where it appears to enforce an effective minimum buffer size of 31.25 ms,
 making it a poor choice for low-latency capture use cases.
 
 The DirectSound backend exposes "virtual" devices called *"Primary Sound Capture
@@ -268,9 +269,11 @@ settings.
 In principle, similar results should be obtained when using WASAPI Exclusive
 and Kernel Streaming, since they both offer exclusive access to the hardware.
 WASAPI is simpler and less likely to cause problems, but Kernel Streaming is
-more direct and more flexible. Furthermore, their internal implementation in
-PortAudio are very different. Therefore, the WASAPI Exclusive and WDM-KS
-PortAudio backends might behave somewhat differently depending on the situation.
+more direct and more flexible. For example, Kernel Streaming will typically
+provide access to underlying hardware buffer sizes that WASAPI Exclusive would
+not use internally. Furthermore, the PortAudio implementation is very different.
+Therefore, the WASAPI Exclusive and WDM-KS PortAudio backends might behave
+somewhat differently depending on the situation.
 
 The WDM-KS backend cannot redirect the stream if the default Windows audio
 device changes while streaming.
