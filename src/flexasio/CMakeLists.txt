@@ -18,9 +18,11 @@ find_package(dechamps_ASIOUtil CONFIG REQUIRED)
 find_package(ASIOTest CONFIG REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
-add_compile_options(
-	/external:anglebrackets /WX /W4 /external:W0 /permissive- /analyze /analyze:external-
-
+# clang-cl accepts the MSVC warning flags below except /analyze and
+# /external:anglebrackets. /analyze is unknown, and /external:anglebrackets is
+# unused, which /WX turns into an error.
+set(FLEXASIO_COMPILE_OPTIONS
+	/WX /W4 /external:W0 /permissive-
 	# Suppress warnings about shadowing declarations.
 	#
 	# In most cases, this happens when a lambda is used to initialize some
@@ -31,6 +33,10 @@ add_compile_options(
 	# the lambda.
 	/wd4458 /wd4456
 )
+if(NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC"))
+	list(APPEND FLEXASIO_COMPILE_OPTIONS /external:anglebrackets /analyze /analyze:external-)
+endif()
+add_compile_options(${FLEXASIO_COMPILE_OPTIONS})
 add_definitions(
 	-DBUILD_CONFIGURATION="$<CONFIG>"
 	-DBUILD_PLATFORM="${FLEXASIO_PLATFORM}"

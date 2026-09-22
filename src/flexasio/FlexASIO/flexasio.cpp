@@ -200,6 +200,8 @@ namespace flexasio {
 				case kAsioEngineVersion:
 					Message(asioMessage, kAsioEngineVersion, 0, nullptr, nullptr);
 					break;
+				default:
+					break;
 				}
 			}
 		}
@@ -544,12 +546,12 @@ namespace flexasio {
 
 		auto exclusivity = hostApi.info.type == paWDMKS ? StreamExclusivity::EXCLUSIVE : StreamExclusivity::SHARED;
 
-		PaStreamParameters common_parameters = { 0 };
+		PaStreamParameters common_parameters {};
 		common_parameters.sampleFormat = paNonInterleaved;
 		common_parameters.hostApiSpecificStreamInfo = NULL;
 		common_parameters.suggestedLatency = defaultSuggestedLatency;
 
-		PaWasapiStreamInfo common_wasapi_stream_info = { 0 };
+		PaWasapiStreamInfo common_wasapi_stream_info {};
 		if (hostApi.info.type == paWASAPI) {
 			common_wasapi_stream_info.size = sizeof(common_wasapi_stream_info);
 			common_wasapi_stream_info.hostApiType = paWASAPI;
@@ -1036,7 +1038,7 @@ namespace flexasio {
 			}
 			else
 			{
-				ASIOTime time = { 0 };
+				ASIOTime time {};
 				time.timeInfo.flags = kSystemTimeValid | kSamplePositionValid | kSampleRateValid;
 				time.timeInfo.samplePosition = currentSamplePosition.samples;
 				time.timeInfo.systemTime = currentSamplePosition.timestamp;
