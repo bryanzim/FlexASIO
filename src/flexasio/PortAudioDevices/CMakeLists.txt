@@ -4,6 +4,6 @@ target_link_libraries(PortAudioDevices
 	PRIVATE dechamps_CMakeUtils_version_stamp
 	PRIVATE FlexASIOUtil_portaudio
 	PRIVATE dechamps_cpputil::string
-	PRIVATE PortAudio::PortAudio
+	PRIVATE PortAudio::portaudio
 )
 install(TARGETS PortAudioDevices RUNTIME DESTINATION bin)
