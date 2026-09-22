@@ -159,7 +159,7 @@ namespace flexasio {
 			OverlappedWithEvent(const OverlappedWithEvent&) = delete;
 			OverlappedWithEvent& operator=(const OverlappedWithEvent&) = delete;
 
-			OVERLAPPED overlapped = { 0 };
+			OVERLAPPED overlapped{};
 		};
 
 	}

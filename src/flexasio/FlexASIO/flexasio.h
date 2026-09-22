@@ -22,7 +22,7 @@ namespace flexasio {
 
 	class ASIOException : public std::runtime_error {
 	public:
-		template <typename... Args> ASIOException(ASIOError asioError, Args&&... args) : asioError(asioError), std::runtime_error(std::forward<Args>(args)...) {}
+		template <typename... Args> ASIOException(ASIOError asioError, Args&&... args) : std::runtime_error(std::forward<Args>(args)...), asioError(asioError) {}
 		ASIOError GetASIOError() const { return asioError; }
 
 	private:
@@ -143,8 +143,8 @@ namespace flexasio {
 				enum class State { PRIMING, PRIMED, STEADYSTATE };
 
 				struct SamplePosition {
-					ASIOSamples samples = { 0 };
-					ASIOTimeStamp timestamp = { 0 };
+					ASIOSamples samples {};
+					ASIOTimeStamp timestamp {};
 				};
 
 				PreparedState& preparedState;

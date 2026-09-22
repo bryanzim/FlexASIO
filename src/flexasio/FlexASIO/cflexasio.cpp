@@ -147,8 +147,6 @@ namespace flexasio {
 			template <typename Method, typename... Args> ASIOError EnterWithMethod(std::string_view context, Method method, Args&&... args);
 		};
 
-		OBJECT_ENTRY_AUTO(__uuidof(::CFlexASIO), CFlexASIO);
-
 		template <typename Functor> ASIOError CFlexASIO::Enter(std::string_view context, Functor functor) {
 			if (IsLoggingEnabled()) Log() << "--- ENTERING CONTEXT: " << context << " on " << this;
 			ASIOError result;
@@ -214,6 +212,11 @@ namespace flexasio {
 		}
 
 	}
+
+	// clang-cl rejects __declspec(selectany) on objects in an anonymous namespace
+	// because they do not have external linkage. ATL's object map entry has to
+	// live in flexasio:: so the linker can see it.
+	OBJECT_ENTRY_AUTO(__uuidof(::CFlexASIO), CFlexASIO);
 }
 
 IASIO* CreateFlexASIO() {
