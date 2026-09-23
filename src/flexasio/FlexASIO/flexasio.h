@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config.h"
+#include "stream_status.h"
 
 #include "portaudio.h"
 #include "../FlexASIOUtil/portaudio.h"
@@ -13,6 +14,7 @@
 #include <windows.h>
 
 #include <atomic>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <mutex>
@@ -138,6 +140,8 @@ namespace flexasio {
 				void OutputReady();
 
 				PaStreamCallbackResult StreamCallback(const void *input, void *output, unsigned long frameCount, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags);
+				void NoteStreamStatus(PaStreamCallbackFlags statusFlags) noexcept;
+				std::int64_t TicksToFrames(std::int64_t ticks) const noexcept;
 
 			private:
 				enum class State { PRIMING, PRIMED, STEADYSTATE };
@@ -157,12 +161,20 @@ namespace flexasio {
 				std::atomic<SamplePosition> samplePosition;
 
 				Win32HighResolutionTimer win32HighResolutionTimer;
+				std::int64_t qpcFrequency = 0;
+				std::int64_t lastSteadyCallbackQpc = 0;
+				bool haveSteadyCallbackQpc = false;
+				// Declared before the active stream so stopping the stream joins the callback
+				// before the icon thread and these counters are destroyed.
+				std::optional<StreamStatus> streamStatus;
+				std::optional<StreamStatusIcon> streamStatusIcon;
 				ActiveStream activeStream;
 			};
 
 			static int StreamCallback(const void *input, void *output, unsigned long frameCount, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData) throw();
 
 			void OnConfigChange();
+			StreamStatusDescription MakeStreamStatusDescription() const;
 
 			FlexASIO& flexASIO;
 			const ASIOSampleRate sampleRate;
