@@ -29,15 +29,21 @@ namespace flexasio {
 			return std::to_wstring((bitsPerSecond + 500) / 1000) + L" kbps";
 		}
 
-		std::wstring FormatBits(const StreamStatusDescription& description) {
-			const int bits = description.outputBits > 0 ? description.outputBits : description.inputBits;
-			if (description.inputChannels > 0 && description.outputChannels > 0 &&
-				description.inputBits > 0 && description.outputBits > 0 &&
-				description.inputBits != description.outputBits) {
-				return std::to_wstring(description.inputBits) + L"/" + std::to_wstring(description.outputBits) + L"-bit";
+		std::wstring FormatDirection(const wchar_t* const label, const std::wstring& device, const int channels, const int bits, const double sampleRate, const long bufferFrames, const std::uint64_t overflow, const std::uint64_t underflow) {
+			std::wostringstream text;
+			text << label << L": " << (device.empty() ? L"(none)" : device) << L"\n";
+			if (channels <= 0) {
+				text << L"  not open\n";
+				return text.str();
 			}
-			if (bits <= 0) return L"unknown bit depth";
-			return std::to_wstring(bits) + L"-bit";
+			const auto bytesPerSample = bits > 0 ? bits / 8.0 : 0.0;
+			const auto bitrate = static_cast<std::int64_t>(std::llround(sampleRate * channels * bytesPerSample * 8.0));
+			text << L"  " << static_cast<int>(std::llround(sampleRate)) << L" Hz, "
+				<< (bits > 0 ? std::to_wstring(bits) + L"-bit" : L"unknown bit depth")
+				<< L", " << FormatBitrate(bitrate) << L"\n"
+				<< L"  " << channels << L" channels, buffer " << bufferFrames << L" frames\n"
+				<< L"  Overflow " << overflow << L", underflow " << underflow << L"\n";
+			return text.str();
 		}
 
 		std::wstring FormatDevice(const StreamStatusDescription& description) {
@@ -62,19 +68,29 @@ namespace flexasio {
 
 		std::wstring FormatPopup(const StreamStatusDescription& description, const StreamStatus::Snapshot& snapshot) {
 			std::wostringstream text;
-			text << L"Stream: " << description.backend << L"\n"
-				<< L"Device: " << FormatDevice(description) << L"\n"
-				<< static_cast<int>(std::llround(description.sampleRate)) << L" Hz, "
-				<< FormatBits(description) << L", " << FormatBitrate(description.bitrateBitsPerSecond) << L"\n"
-				<< L"Channels: " << description.inputChannels << L" in, " << description.outputChannels << L" out\n"
-				<< L"Buffer: " << description.bufferFrames << L" frames\n";
-			if (!snapshot.hasSlack) text << L"Slack min/max: n/a\n";
-			else text << L"Slack min/max: " << snapshot.minSlackFrames << L" / " << snapshot.maxSlackFrames << L" frames\n";
-			text << L"Input overflow: " << snapshot.inputOverflow << L"\n"
-				<< L"Input underflow: " << snapshot.inputUnderflow << L"\n"
-				<< L"Output overflow: " << snapshot.outputOverflow << L"\n"
-				<< L"Output underflow: " << snapshot.outputUnderflow;
+			text << L"Stream: " << description.backend << L"\n\n"
+				<< FormatDirection(L"Device in", description.inputDevice, description.inputChannels, description.inputBits, description.sampleRate, description.bufferFrames, snapshot.inputOverflow, snapshot.inputUnderflow)
+				<< L"\n"
+				<< FormatDirection(L"Device out", description.outputDevice, description.outputChannels, description.outputBits, description.sampleRate, description.bufferFrames, snapshot.outputOverflow, snapshot.outputUnderflow)
+				<< L"\n";
+			if (!snapshot.hasSlack) text << L"Early/late min/avg/max: n/a\n";
+			else text << L"Early/late min/avg/max: " << snapshot.minSlackFrames << L" / " << snapshot.averageSlackFrames << L" / " << snapshot.maxSlackFrames << L" frames";
 			return text.str();
+		}
+
+		constexpr UINT kPopupDrawFlags = DT_LEFT | DT_TOP | DT_WORDBREAK | DT_NOPREFIX;
+		constexpr int kResetButtonId = 1;
+		constexpr int kResetButtonHeight = 26;
+		constexpr int kResetButtonGap = 10;
+
+		int MeasurePopupTextHeight(const std::wstring& text, const HFONT font, const int contentWidth) {
+			const HDC dc = GetDC(nullptr);
+			const HGDIOBJ previousFont = font != nullptr ? SelectObject(dc, font) : nullptr;
+			RECT bounds{ 0, 0, contentWidth, 0 };
+			DrawTextW(dc, text.c_str(), static_cast<int>(text.size()), &bounds, kPopupDrawFlags | DT_CALCRECT);
+			if (previousFont != nullptr) SelectObject(dc, previousFont);
+			ReleaseDC(nullptr, dc);
+			return bounds.bottom - bounds.top;
 		}
 
 		HICON CreateStatusIcon() {
@@ -155,6 +171,19 @@ namespace flexasio {
 		while (slackFrames > currentMax &&
 			!maxSlackFrames.compare_exchange_weak(currentMax, slackFrames, std::memory_order_relaxed)) {
 		}
+		slackSumFrames.fetch_add(slackFrames, std::memory_order_relaxed);
+		slackSampleCount.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	void StreamStatus::Reset() noexcept {
+		slackSampleCount.store(0, std::memory_order_relaxed);
+		slackSumFrames.store(0, std::memory_order_relaxed);
+		minSlackFrames.store(INT64_MAX, std::memory_order_relaxed);
+		maxSlackFrames.store(INT64_MIN, std::memory_order_relaxed);
+		inputOverflowCount.store(0, std::memory_order_relaxed);
+		inputUnderflowCount.store(0, std::memory_order_relaxed);
+		outputOverflowCount.store(0, std::memory_order_relaxed);
+		outputUnderflowCount.store(0, std::memory_order_relaxed);
 	}
 
 	StreamStatus::Snapshot StreamStatus::LoadSnapshot() const noexcept {
@@ -165,11 +194,18 @@ namespace flexasio {
 		snapshot.outputUnderflow = outputUnderflowCount.load(std::memory_order_relaxed);
 		snapshot.minSlackFrames = minSlackFrames.load(std::memory_order_relaxed);
 		snapshot.maxSlackFrames = maxSlackFrames.load(std::memory_order_relaxed);
-		snapshot.hasSlack = snapshot.minSlackFrames != INT64_MAX;
+		const auto sampleCount = slackSampleCount.load(std::memory_order_relaxed);
+		snapshot.hasSlack = sampleCount > 0 && snapshot.minSlackFrames != INT64_MAX;
+		if (snapshot.hasSlack) {
+			const auto sum = slackSumFrames.load(std::memory_order_relaxed);
+			const auto half = static_cast<std::int64_t>(sampleCount / 2);
+			const auto count = static_cast<std::int64_t>(sampleCount);
+			snapshot.averageSlackFrames = sum >= 0 ? (sum + half) / count : (sum - half) / count;
+		}
 		return snapshot;
 	}
 
-	StreamStatusIcon::StreamStatusIcon(const StreamStatus& status) : status(status) {
+	StreamStatusIcon::StreamStatusIcon(StreamStatus& status) : status(status) {
 		started = CreateEventW(nullptr, TRUE, FALSE, nullptr);
 		if (started == nullptr) throw std::system_error(GetLastError(), std::system_category(), "Unable to create stream status event");
 		thread = std::thread([this] { ThreadMain(); });
@@ -271,12 +307,22 @@ namespace flexasio {
 			return;
 		}
 
+		if (font == nullptr) {
+			font = CreateFontW(-16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+				CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+		}
+
 		POINT cursor{};
 		GetCursorPos(&cursor);
 		RECT workArea{};
 		SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
-		constexpr int width = 460;
-		constexpr int height = 230;
+		constexpr int contentWidth = 500;
+		constexpr int padding = 12;
+		const int textHeight = MeasurePopupTextHeight(popupText, font, contentWidth);
+		RECT windowRect{ 0, 0, contentWidth + padding * 2, textHeight + padding * 2 + kResetButtonGap + kResetButtonHeight };
+		AdjustWindowRectEx(&windowRect, WS_POPUP | WS_CAPTION | WS_SYSMENU, FALSE, WS_EX_TOPMOST | WS_EX_TOOLWINDOW);
+		const int width = windowRect.right - windowRect.left;
+		const int height = windowRect.bottom - windowRect.top;
 		int x = cursor.x;
 		int y = cursor.y - height - 8;
 		if (x + width > workArea.right) x = workArea.right - width;
@@ -284,20 +330,26 @@ namespace flexasio {
 		if (y < workArea.top) y = cursor.y + 8;
 		if (y + height > workArea.bottom) y = workArea.bottom - height;
 
-		if (font == nullptr) {
-			font = CreateFontW(-16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
-				CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
-		}
 		popup = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, kWindowClassName, L"FlexASIO",
 			WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
 			x, y, width, height, nullptr, nullptr, nullptr, this);
-		if (popup != nullptr) SetForegroundWindow(popup);
+		if (popup != nullptr) {
+			RECT client{};
+			GetClientRect(popup, &client);
+			resetButton = CreateWindowExW(0, L"BUTTON", L"Reset statistics",
+				WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+				padding, client.bottom - padding - kResetButtonHeight, 160, kResetButtonHeight,
+				popup, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kResetButtonId)), nullptr, nullptr);
+			if (resetButton != nullptr && font != nullptr) SendMessageW(resetButton, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+			SetForegroundWindow(popup);
+		}
 	}
 
 	void StreamStatusIcon::DestroyPopup() noexcept {
 		if (popup == nullptr) return;
 		const HWND window = popup;
 		popup = nullptr;
+		resetButton = nullptr;
 		DestroyWindow(window);
 	}
 
@@ -308,10 +360,11 @@ namespace flexasio {
 		GetClientRect(popupWindow, &client);
 		FillRect(dc, &client, reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1));
 		InflateRect(&client, -12, -12);
+		client.bottom -= kResetButtonHeight + kResetButtonGap;
 		SetBkMode(dc, TRANSPARENT);
 		SetTextColor(dc, GetSysColor(COLOR_WINDOWTEXT));
 		const HGDIOBJ previousFont = font != nullptr ? SelectObject(dc, font) : nullptr;
-		DrawTextW(dc, popupText.c_str(), static_cast<int>(popupText.size()), &client, DT_LEFT | DT_TOP | DT_NOPREFIX);
+		DrawTextW(dc, popupText.c_str(), static_cast<int>(popupText.size()), &client, kPopupDrawFlags);
 		if (previousFont != nullptr) SelectObject(dc, previousFont);
 		EndPaint(popupWindow, &paint);
 	}
@@ -327,6 +380,15 @@ namespace flexasio {
 			if (event == NIN_SELECT || event == NIN_KEYSELECT || event == WM_LBUTTONUP || event == WM_LBUTTONDBLCLK) ShowPopup();
 			return 0;
 		}
+		case WM_COMMAND:
+			if (window == popup && LOWORD(wParam) == kResetButtonId && HIWORD(wParam) == BN_CLICKED) {
+				status.Reset();
+				popupText = FormatPopup(status.Description(), status.LoadSnapshot());
+				InvalidateRect(popup, nullptr, TRUE);
+				UpdateTip();
+				return 0;
+			}
+			break;
 		case WM_TIMER:
 			UpdateTip();
 			if (popup != nullptr) {
