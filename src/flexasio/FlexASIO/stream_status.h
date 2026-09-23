@@ -32,6 +32,7 @@ namespace flexasio {
 
 		void NoteGlitches(bool inputOverflow, bool inputUnderflow, bool outputOverflow, bool outputUnderflow) noexcept;
 		void NoteSlackFrames(std::int64_t slackFrames) noexcept;
+		void Reset() noexcept;
 
 		struct Snapshot {
 			std::uint64_t inputOverflow = 0;
@@ -39,6 +40,7 @@ namespace flexasio {
 			std::uint64_t outputOverflow = 0;
 			std::uint64_t outputUnderflow = 0;
 			std::int64_t minSlackFrames = 0;
+			std::int64_t averageSlackFrames = 0;
 			std::int64_t maxSlackFrames = 0;
 			bool hasSlack = false;
 		};
@@ -52,13 +54,15 @@ namespace flexasio {
 		std::atomic<std::uint64_t> outputUnderflowCount{ 0 };
 		std::atomic<std::int64_t> minSlackFrames{ INT64_MAX };
 		std::atomic<std::int64_t> maxSlackFrames{ INT64_MIN };
+		std::atomic<std::int64_t> slackSumFrames{ 0 };
+		std::atomic<std::uint64_t> slackSampleCount{ 0 };
 	};
 
 	// Notification-area icon and click popup. Owns a thread with its own message loop
 	// because the ASIO host does not pump messages for the driver.
 	class StreamStatusIcon final {
 	public:
-		explicit StreamStatusIcon(const StreamStatus& status);
+		explicit StreamStatusIcon(StreamStatus& status);
 		~StreamStatusIcon();
 
 		StreamStatusIcon(const StreamStatusIcon&) = delete;
@@ -75,11 +79,12 @@ namespace flexasio {
 		LRESULT HandleMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
 		static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) noexcept;
 
-		const StreamStatus& status;
+		StreamStatus& status;
 		HANDLE started = nullptr;
 		std::thread thread;
 		std::atomic<HWND> messageWindow{ nullptr };
 		HWND popup = nullptr;
+		HWND resetButton = nullptr;
 		HICON icon = nullptr;
 		bool iconIsOwned = false;
 		HFONT font = nullptr;
