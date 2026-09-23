@@ -1,6 +1,7 @@
 #include "flexasio.h"
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -21,8 +22,27 @@
 
 #include "control_panel.h"
 #include "log.h"
+#include "../FlexASIOUtil/windows_string.h"
 
 namespace flexasio {
+
+	namespace {
+
+		std::wstring WidenDeviceName(const char* const name) {
+			if (name == nullptr || name[0] == '\0') return {};
+			try {
+				return ConvertFromUTF8(name);
+			}
+			catch (const std::exception&) {
+				const auto size = MultiByteToWideChar(CP_ACP, 0, name, -1, nullptr, 0);
+				if (size <= 1) return {};
+				std::wstring result(static_cast<size_t>(size - 1), 0);
+				MultiByteToWideChar(CP_ACP, 0, name, -1, result.data(), size);
+				return result;
+			}
+		}
+
+	}
 
 	FlexASIO::PortAudioHandle::PortAudioHandle() {
 		Log() << "Initializing PortAudio";
@@ -916,7 +936,24 @@ namespace flexasio {
 	}()),
 		outputReadyState([&]() -> std::optional<std::atomic<OutputReadyState>> {
 		if (preparedState.flexASIO.hostSupportsOutputReady) return OutputReadyState::READY; else return std::nullopt;
-	}()) {}
+	}()) {
+		LARGE_INTEGER frequency;
+		if (QueryPerformanceFrequency(&frequency)) qpcFrequency = frequency.QuadPart;
+		try {
+			streamStatus.emplace(preparedState.MakeStreamStatusDescription());
+		}
+		catch (const std::exception& exception) {
+			Log() << "Unable to record stream status: " << exception.what();
+		}
+		if (streamStatus.has_value()) {
+			try {
+				streamStatusIcon.emplace(*streamStatus);
+			}
+			catch (const std::exception& exception) {
+				Log() << "Stream status icon unavailable: " << exception.what();
+			}
+		}
+	}
 
 	FlexASIO::PreparedState::RunningState::~RunningState() {
 		if (outputReadyState.has_value()) {
@@ -968,6 +1005,25 @@ namespace flexasio {
 		return result;
 	}
 
+	StreamStatusDescription FlexASIO::PreparedState::MakeStreamStatusDescription() const {
+		StreamStatusDescription description;
+		description.backend = WidenDeviceName(GetHostApiTypeIdString(flexASIO.hostApi.info.type).c_str());
+		description.backend += GetStreamExclusivity() == StreamExclusivity::EXCLUSIVE ? L" exclusive" : L" shared";
+		if (flexASIO.inputDevice.has_value()) description.inputDevice = WidenDeviceName(flexASIO.inputDevice->info.name);
+		if (flexASIO.outputDevice.has_value()) description.outputDevice = WidenDeviceName(flexASIO.outputDevice->info.name);
+		description.sampleRate = sampleRate;
+		description.inputChannels = static_cast<int>(buffers.inputChannelCount);
+		description.outputChannels = static_cast<int>(buffers.outputChannelCount);
+		description.inputBits = flexASIO.inputSampleType.has_value() ? static_cast<int>(flexASIO.inputSampleType->size * 8) : 0;
+		description.outputBits = flexASIO.outputSampleType.has_value() ? static_cast<int>(flexASIO.outputSampleType->size * 8) : 0;
+		description.bufferFrames = static_cast<long>(buffers.bufferSizeInFrames);
+		const auto bytesPerSecond = description.sampleRate * (
+			description.inputChannels * (description.inputBits / 8.0) +
+			description.outputChannels * (description.outputBits / 8.0));
+		description.bitrateBitsPerSecond = static_cast<std::int64_t>(std::llround(bytesPerSecond * 8.0));
+		return description;
+	}
+
 	void FlexASIO::PreparedState::OnConfigChange() {
 		Log() << "Issuing reset request due to config change";
 		try {
@@ -978,8 +1034,36 @@ namespace flexasio {
 		}
 	}
 
+	std::int64_t FlexASIO::PreparedState::RunningState::TicksToFrames(const std::int64_t ticks) const noexcept {
+		if (qpcFrequency <= 0) return 0;
+		return static_cast<std::int64_t>(std::llround(static_cast<double>(ticks) * preparedState.sampleRate / static_cast<double>(qpcFrequency)));
+	}
+
+	void FlexASIO::PreparedState::RunningState::NoteStreamStatus(const PaStreamCallbackFlags statusFlags) noexcept {
+		if (!streamStatus.has_value()) return;
+		streamStatus->NoteGlitches(
+			(statusFlags & paInputOverflow) != 0,
+			(statusFlags & paInputUnderflow) != 0,
+			(statusFlags & paOutputOverflow) != 0,
+			(statusFlags & paOutputUnderflow) != 0);
+		if (qpcFrequency <= 0) return;
+
+		LARGE_INTEGER now;
+		QueryPerformanceCounter(&now);
+		if (state == State::STEADYSTATE && haveSteadyCallbackQpc) {
+			const auto elapsedFrames = TicksToFrames(now.QuadPart - lastSteadyCallbackQpc);
+			streamStatus->NoteSlackFrames(static_cast<std::int64_t>(preparedState.buffers.bufferSizeInFrames) - elapsedFrames);
+		}
+		if (state == State::STEADYSTATE) {
+			lastSteadyCallbackQpc = now.QuadPart;
+			haveSteadyCallbackQpc = true;
+		}
+	}
+
 	PaStreamCallbackResult FlexASIO::PreparedState::RunningState::StreamCallback(const void *input, void *output, unsigned long frameCount, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags)
 	{
+		NoteStreamStatus(statusFlags);
+
 		auto currentSamplePosition = samplePosition.load();
 		currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
 		if (state == State::STEADYSTATE) currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + frameCount);
@@ -1054,7 +1138,15 @@ namespace flexasio {
 		}
 		else if (*outputReady == OutputReadyState::NOT_READY) {
 			if (IsLoggingEnabled()) Log() << "Waiting for the ASIO Host Application to signal OutputReady or stop";
+			LARGE_INTEGER waitStart{};
+			const bool timeWait = streamStatus.has_value() && qpcFrequency > 0 && QueryPerformanceCounter(&waitStart);
 			outputReady->wait(OutputReadyState::NOT_READY);
+			if (timeWait && state == State::STEADYSTATE) {
+				LARGE_INTEGER waitEnd;
+				QueryPerformanceCounter(&waitEnd);
+				const auto waitFrames = TicksToFrames(waitEnd.QuadPart - waitStart.QuadPart);
+				if (waitFrames > 0) streamStatus->NoteSlackFrames(-waitFrames);
+			}
 		}
 
 		if (IsLoggingEnabled()) Log() << "Transferring output buffers from buffer index #" << driverBufferIndex << " to PortAudio";

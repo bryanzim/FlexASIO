@@ -63,6 +63,14 @@ target_link_libraries(FlexASIO_portaudio
 	PRIVATE PortAudio::portaudio
 )
 
+add_library(FlexASIO_stream_status STATIC EXCLUDE_FROM_ALL stream_status.cpp)
+target_link_libraries(FlexASIO_stream_status
+	PRIVATE FlexASIO_log
+	PRIVATE shell32
+	PRIVATE user32
+	PRIVATE gdi32
+)
+
 add_library(FlexASIO_flexasio STATIC EXCLUDE_FROM_ALL flexasio.cpp)
 target_link_libraries(FlexASIO_flexasio
 	PUBLIC dechamps_ASIOUtil::asiosdk_asioh
@@ -72,6 +80,8 @@ target_link_libraries(FlexASIO_flexasio
 	PRIVATE dechamps_ASIOUtil::asio
 	PRIVATE FlexASIO_control_panel
 	PRIVATE FlexASIO_log
+	PRIVATE FlexASIO_stream_status
+	PRIVATE FlexASIOUtil_windows_string
 	PRIVATE dechamps_cpputil::endian
 	PRIVATE dechamps_cpputil::exception
 	PRIVATE dechamps_cpputil::string
