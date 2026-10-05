@@ -25,7 +25,7 @@ namespace flexasio {
 			bool operator==(const NoDevice&) const { return true; }
 		};
 		struct DeviceRegex final {
-			DeviceRegex(std::string string) : string(std::move(string)), regex(this->string) {}
+			DeviceRegex(std::string string) : string{std::move(string)}, regex{this->string} {}
 
 			const std::string& getString() const { return string; }
 			const std::regex& getRegex() const { return regex; }
@@ -46,9 +46,9 @@ namespace flexasio {
 			std::optional<int> channels;
 			std::optional<std::string> sampleType;
 			std::optional<double> suggestedLatencySeconds;
-			bool wasapiExclusiveMode = false;
-			bool wasapiAutoConvert = true;
-			bool wasapiExplicitSampleFormat = true;
+			bool wasapiExclusiveMode{false};
+			bool wasapiAutoConvert{true};
+			bool wasapiExplicitSampleFormat{true};
 
 			bool operator==(const Stream& other) const {
 				return
@@ -121,7 +121,7 @@ namespace flexasio {
 			
 			std::binary_semaphore stopSemaphore{0};
 			std::mutex directoryMutex;
-			HANDLE directory = INVALID_HANDLE_VALUE;
+			HANDLE directory{INVALID_HANDLE_VALUE};
 
 			std::thread thread;
 		};

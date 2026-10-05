@@ -58,7 +58,7 @@ namespace flexasio {
 			}
 			void getDriverName(char* name) throw() final {
 				Enter("getDriverName()", [&] {
-					strcpy_s(name, 32, "FlexASIO");
+					strcpy_s(name, 32U, "FlexASIO");
 				});
 			}
 			long getDriverVersion() throw() final {
@@ -68,7 +68,7 @@ namespace flexasio {
 			void getErrorMessage(char* string) throw() final {
 				Enter("getErrorMessage()", [&] {
 					std::string_view error(lastError);
-					constexpr auto maxSize = 123;
+					constexpr auto maxSize{123U};
 					if (error.size() > maxSize) error.remove_suffix(error.size() - maxSize);
 					std::copy(error.begin(), error.end(), string);
 					string[error.size()] = '\0';
@@ -87,7 +87,7 @@ namespace flexasio {
 				return EnterWithMethod("getChannelInfo()", &FlexASIO::GetChannelInfo, info);
 			}
 			ASIOError canSampleRate(ASIOSampleRate sampleRate) throw() final {
-				bool result;
+				bool result{};
 				const auto error = EnterInitialized("canSampleRate()", [&] {
 					result = flexASIO->CanSampleRate(sampleRate);
 				});
@@ -149,7 +149,7 @@ namespace flexasio {
 
 		template <typename Functor> ASIOError CFlexASIO::Enter(std::string_view context, Functor functor) {
 			if (IsLoggingEnabled()) Log() << "--- ENTERING CONTEXT: " << context << " on " << this;
-			ASIOError result;
+			ASIOError result{};
 			try {
 				functor();
 				result = ASE_OK;
@@ -198,7 +198,7 @@ namespace flexasio {
 				clocks->associatedChannel = -1;
 				clocks->associatedGroup = -1;
 				clocks->isCurrentSource = ASIOTrue;
-				strcpy_s(clocks->name, 32, "Internal");
+				strcpy_s(clocks->name, 32U, "Internal");
 				*numSources = 1;
 			});
 		}

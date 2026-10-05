@@ -21,7 +21,7 @@ namespace flexasio {
 
 		void Execute(HWND windowHandle, const std::wstring& file) {
 			Log() << "Initializing COM for shell execution";
-			std::optional<COMInitializer> comInitializer;
+			std::optional<COMInitializer> comInitializer{};
 			try {
 				// As suggested in https://docs.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shellexecutew#remarks
 				comInitializer.emplace(COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
@@ -39,13 +39,13 @@ namespace flexasio {
 		}
 
 		std::wstring GetStringRegistryValue(HKEY registryKey, LPCWSTR valueName) {
-			std::vector<unsigned char> value;
+			std::vector<unsigned char> value{};
 			for (;;) {
-				DWORD valueType = REG_NONE;
-				DWORD valueSize = static_cast<DWORD>(value.size());
+				DWORD valueType{REG_NONE};
+				DWORD valueSize{static_cast<DWORD>(value.size())};
 				Log() << "Querying registry value with buffer size " << valueSize;
-				const auto regQueryValueError = ::RegQueryValueExW(registryKey, valueName, NULL, &valueType, reinterpret_cast<BYTE*>(value.data()), &valueSize);
-				if ((regQueryValueError == ERROR_SUCCESS && value.size() == 0) || regQueryValueError == ERROR_MORE_DATA) {
+				const auto regQueryValueError{::RegQueryValueExW(registryKey, valueName, NULL, &valueType, reinterpret_cast<BYTE*>(value.data()), &valueSize)};
+				if ((regQueryValueError == ERROR_SUCCESS && value.size() == 0U) || regQueryValueError == ERROR_MORE_DATA) {
 					if (valueSize <= value.size()) throw std::runtime_error("Invalid value size returned from RegQueryValueEx(" + std::to_string(value.size()) + "): " + std::to_string(valueSize));
 					value.resize(valueSize);
 					continue;
@@ -57,8 +57,8 @@ namespace flexasio {
 				break;
 			}
 
-			const auto char_size = sizeof(std::wstring::value_type);
-			if (value.size() % char_size != 0) throw std::runtime_error("Invalid value size returned from RegQueryValueEx(): " + std::to_string(value.size()));
+			const auto char_size{sizeof(std::wstring::value_type)};
+			if (value.size() % char_size != 0U) throw std::runtime_error("Invalid value size returned from RegQueryValueEx(): " + std::to_string(value.size()));
 			std::wstring result(value.size() / char_size, 0);
 			memcpy(result.data(), value.data(), value.size());
 			while (!result.empty() && result.back() == 0) result.pop_back();
@@ -66,10 +66,10 @@ namespace flexasio {
 		}
 
 		UniqueHKEY OpenFlexAsioGuiInstallRegistryKey() {
-			HKEY registryKey;
-			const auto regOpenKeyError = ::RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"Software\\Fabrikat\\FlexASIOGUI\\Install", {}, KEY_QUERY_VALUE | KEY_WOW64_64KEY, &registryKey);
+			HKEY registryKey{};
+			const auto regOpenKeyError{::RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"Software\\Fabrikat\\FlexASIOGUI\\Install", {}, KEY_QUERY_VALUE | KEY_WOW64_64KEY, &registryKey)};
 			if (regOpenKeyError != ERROR_SUCCESS) throw std::system_error(regOpenKeyError, std::system_category(), "Unable to open FlexASIOGUI registry key");
-			return UniqueHKEY(registryKey);
+			return UniqueHKEY{registryKey};
 		}
 
 		std::wstring GetFlexAsioGuiInstallDirectory() {
@@ -81,14 +81,14 @@ namespace flexasio {
 		}
 
 		void OpenFlexAsioGui(HWND windowHandle) {
-			const auto installDirectory = GetFlexAsioGuiInstallDirectory();
+			const auto installDirectory{GetFlexAsioGuiInstallDirectory()};
 			Log() << "FlexASIOGUI install directory: " << ConvertToUTF8(installDirectory);
 
 			Execute(windowHandle, installDirectory + L"\\FlexASIOGUI.exe");
 		}
 		
 		void OpenConfigurationDocs(HWND windowHandle) {
-			Execute(windowHandle, std::wstring(L"https://github.com/dechamps/FlexASIO/blob/") + ConvertFromUTF8(::dechamps_CMakeUtils_gitDescription) + L"/CONFIGURATION.md");
+			Execute(windowHandle, std::wstring{L"https://github.com/dechamps/FlexASIO/blob/"} + ConvertFromUTF8(::dechamps_CMakeUtils_gitDescription) + L"/CONFIGURATION.md");
 		}
 
 	}

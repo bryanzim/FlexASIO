@@ -14,7 +14,7 @@ namespace flexasio {
 		class FlexASIOLogSink final : public ::dechamps_cpplog::LogSink {
 			public:
 				static std::unique_ptr<FlexASIOLogSink> Open() {
-					std::filesystem::path path;
+					std::filesystem::path path{};
 					try {
 						path = GetUserDirectory();
 					}
@@ -33,8 +33,8 @@ namespace flexasio {
 					return output.get();
 				}
 
-				FlexASIOLogSink(const std::filesystem::path& path) : file_sink(path) {
-					::dechamps_cpplog::Logger(this) << "FlexASIO " << BUILD_CONFIGURATION << " " << BUILD_PLATFORM << " " << ::dechamps_CMakeUtils_gitDescriptionDirty << " built on " << ::dechamps_CMakeUtils_buildTime;
+				FlexASIOLogSink(const std::filesystem::path& path) : file_sink{path} {
+					::dechamps_cpplog::Logger{this} << "FlexASIO " << BUILD_CONFIGURATION << " " << BUILD_PLATFORM << " " << ::dechamps_CMakeUtils_gitDescriptionDirty << " built on " << ::dechamps_CMakeUtils_buildTime;
 				}
 
 				void Write(const std::string_view str) override { return preamble_sink.Write(str); }
@@ -48,6 +48,6 @@ namespace flexasio {
 	}
 
 	bool IsLoggingEnabled() { return FlexASIOLogSink::Get() != nullptr; }
-	::dechamps_cpplog::Logger Log() { return ::dechamps_cpplog::Logger(FlexASIOLogSink::Get()); }
+	::dechamps_cpplog::Logger Log() { return ::dechamps_cpplog::Logger{FlexASIOLogSink::Get()}; }
 
 }

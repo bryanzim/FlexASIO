@@ -24,7 +24,7 @@ namespace flexasio {
 
 	class ASIOException : public std::runtime_error {
 	public:
-		template <typename... Args> ASIOException(ASIOError asioError, Args&&... args) : std::runtime_error(std::forward<Args>(args)...), asioError(asioError) {}
+		template <typename... Args> ASIOException(ASIOError asioError, Args&&... args) : std::runtime_error{std::forward<Args>(args)...}, asioError{asioError} {}
 		ASIOError GetASIOError() const { return asioError; }
 
 	private:
@@ -107,8 +107,8 @@ namespace flexasio {
 				std::byte* GetInputBuffer(size_t bufferSetIndex, size_t channelIndex) { return buffers.data() + bufferSetIndex * GetBufferSetSizeInBytes() + channelIndex * GetInputBufferSizeInBytes(); }
 				std::byte* GetOutputBuffer(size_t bufferSetIndex, size_t channelIndex) { return GetInputBuffer(bufferSetIndex, inputChannelCount) + channelIndex * GetOutputBufferSizeInBytes(); }
 				size_t GetBufferSetSizeInBytes() const { return buffers.size() / bufferSetCount; }
-				size_t GetInputBufferSizeInBytes() const { if (buffers.empty()) return 0; return bufferSizeInFrames * inputSampleSizeInBytes; }
-				size_t GetOutputBufferSizeInBytes() const { if (buffers.empty()) return 0; return bufferSizeInFrames * outputSampleSizeInBytes; }
+				size_t GetInputBufferSizeInBytes() const { if (buffers.empty()) return 0U; return bufferSizeInFrames * inputSampleSizeInBytes; }
+				size_t GetOutputBufferSizeInBytes() const { if (buffers.empty()) return 0U; return bufferSizeInFrames * outputSampleSizeInBytes; }
 
 				const size_t bufferSetCount;
 				const size_t inputChannelCount;
@@ -155,15 +155,15 @@ namespace flexasio {
 				const bool host_supports_timeinfo;
 				enum class OutputReadyState { NOT_READY, READY, STOPPING };
 				std::optional<std::atomic<OutputReadyState>> outputReadyState;
-				State state = outputReadyState.has_value() ? State::PRIMING : State::PRIMED;
+				State state{outputReadyState.has_value() ? State::PRIMING : State::PRIMED};
 				// The index of the "unlocked" buffer (or "half-buffer", i.e. 0 or 1) that contains data not currently being processed by the ASIO host.
-				long driverBufferIndex = state == State::PRIMING ? 1 : 0;
+				long driverBufferIndex{state == State::PRIMING ? 1 : 0};
 				std::atomic<SamplePosition> samplePosition;
 
 				Win32HighResolutionTimer win32HighResolutionTimer;
-				std::int64_t qpcFrequency = 0;
-				std::int64_t lastSteadyCallbackQpc = 0;
-				bool haveSteadyCallbackQpc = false;
+				std::int64_t qpcFrequency{0};
+				std::int64_t lastSteadyCallbackQpc{0};
+				bool haveSteadyCallbackQpc{false};
 				// Declared before the active stream so stopping the stream joins the callback
 				// before the icon thread and these counters are destroyed.
 				std::optional<StreamStatus> streamStatus;
@@ -225,7 +225,7 @@ namespace flexasio {
 		decltype(auto) WithStreamParameters(bool inputEnabled, bool outputEnabled, double sampleRate, PaTime suggestedLatency, Functor functor) const;
 		Stream OpenStream(const StreamParameters&, unsigned long framesPerBuffer, PaStreamCallback callback, void* callbackUserData) const;
 
-		const HWND windowHandle = nullptr;
+		const HWND windowHandle{nullptr};
 		const ConfigLoader configLoader;
 		const Config& config = configLoader.Initial();
 
@@ -240,9 +240,9 @@ namespace flexasio {
 		const DWORD inputChannelMask;
 		const DWORD outputChannelMask;
 
-		ASIOSampleRate sampleRate = 0;
-		bool sampleRateWasAccessed = false;
-		bool hostSupportsOutputReady = false;
+		ASIOSampleRate sampleRate{0};
+		bool sampleRateWasAccessed{false};
+		bool hostSupportsOutputReady{false};
 
 		std::optional<PreparedState> preparedState;
 	};

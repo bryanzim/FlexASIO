@@ -8,7 +8,7 @@
 namespace flexasio {
 
 	std::string ConvertToUTF8(std::wstring_view input) {
-		if (input.size() == 0) return {};
+		if (input.size() == 0U) return {};
 
 		const auto size = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, input.data(), static_cast<int>(input.size()), NULL, 0, NULL, NULL);
 		if (size <= 0) throw std::system_error(::GetLastError(), std::system_category(), "Unable to get size for string conversion to UTF-8");
@@ -20,7 +20,7 @@ namespace flexasio {
 	}
 
 	std::wstring ConvertFromUTF8(std::string_view input) {
-		if (input.size() == 0) return {};
+		if (input.size() == 0U) return {};
 
 		const auto size = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, input.data(), int(input.size()), NULL, 0);
 		if (size <= 0) throw std::system_error(::GetLastError(), std::system_category(), "Unable to get size for string conversion from UTF-8");
