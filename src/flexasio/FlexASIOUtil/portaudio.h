@@ -30,8 +30,8 @@ namespace flexasio {
 
 		private:
 			std::mutex mutex;
-			size_t referenceCount = 0;
-			Write* write = nullptr;
+			size_t referenceCount{0U};
+			Write* write{nullptr};
 
 			static void DebugPrint(const char*);
 
@@ -51,7 +51,7 @@ namespace flexasio {
 	std::string GetStreamCallbackFlagsString(PaStreamCallbackFlags streamCallbackFlags);
 
 	struct HostApi {
-		explicit HostApi(PaHostApiIndex index) : index(index), info(GetInfo(index)) {}
+		explicit HostApi(PaHostApiIndex index) : index{index}, info{GetInfo(index)} {}
 
 		const PaHostApiIndex index;
 		const PaHostApiInfo& info;
@@ -63,7 +63,7 @@ namespace flexasio {
 	};
 
 	struct Device {
-		explicit Device(PaDeviceIndex index) : index(index), info(GetInfo(index)) {}
+		explicit Device(PaDeviceIndex index) : index{index}, info{GetInfo(index)} {}
 
 		const PaDeviceIndex index;
 		const PaDeviceInfo& info;

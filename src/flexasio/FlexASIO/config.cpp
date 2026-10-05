@@ -18,20 +18,20 @@ namespace flexasio {
 		toml::Value LoadConfigToml(const std::filesystem::path& path) {
 			Log() << "Attempting to load configuration file: " << path;
 
-			std::ifstream stream;
+			std::ifstream stream{};
 			stream.exceptions(stream.badbit | stream.failbit);
 			try {
 				stream.open(path);
 			}
 			catch (const std::exception& exception) {
 				Log() << "Unable to open configuration file: " << exception.what();
-				return toml::Table();
+				return toml::Table{};
 			}
 			stream.exceptions(stream.badbit);
 
 			const auto parseResult = [&] {
 				try {
-					const auto parseResult = toml::parse(stream);
+					const auto parseResult{toml::parse(stream)};
 					if (!parseResult.valid()) throw std::runtime_error(parseResult.errorReason);
 					return parseResult;
 				}
@@ -46,7 +46,7 @@ namespace flexasio {
 		}
 
 		template <typename Functor> void ProcessOption(const toml::Table& table, const std::string& key, Functor functor) {
-			const auto value = table.find(key);
+			const auto value{table.find(key)};
 			if (value == table.end()) return;
 			try {
 				return functor(value->second);
@@ -90,13 +90,13 @@ namespace flexasio {
 			if (table.find("device") != table.end() && table.find("deviceRegex") != table.end())
 				throw std::runtime_error("the device and deviceRegex options cannot be specified at the same time");
 			ProcessTypedOption<std::string>(table, "device", [&](const std::string& deviceString) {
-				if (deviceString == "") stream.device = Config::NoDevice();
+				if (deviceString == "") stream.device = Config::NoDevice{};
 				else stream.device = deviceString;
 			});
 			ProcessTypedOption<std::string>(table, "deviceRegex", [&](const std::string& deviceRegexString) {
 				if (deviceRegexString == "") throw std::runtime_error("the deviceRegex option cannot be empty");
 				try {
-					stream.device = Config::DeviceRegex(deviceRegexString);
+					stream.device = Config::DeviceRegex{deviceRegexString};
 				}
 				catch (...) {
 					std::throw_with_nested(std::runtime_error("Invalid regex in deviceRegex option"));
@@ -120,7 +120,7 @@ namespace flexasio {
 
 
 		Config LoadConfig(const std::filesystem::path& path) {
-			toml::Value tomlValue;
+			toml::Value tomlValue{};
 			try {
 				tomlValue = LoadConfigToml(path);
 			}
@@ -129,7 +129,7 @@ namespace flexasio {
 			}
 
 			try {
-				Config config;
+				Config config{};
 				SetConfig(tomlValue.as<toml::Table>(), config);
 				return config;
 			}
@@ -153,7 +153,7 @@ namespace flexasio {
 					throw std::system_error(::GetLastError(), std::system_category(), "Unable to create watch event");
 			}
 			~OverlappedWithEvent() {
-				UniqueHandle(overlapped.hEvent);
+				UniqueHandle{overlapped.hEvent};
 			}
 
 			OverlappedWithEvent(const OverlappedWithEvent&) = delete;
@@ -165,19 +165,19 @@ namespace flexasio {
 	}
 
 	ConfigLoader::Watcher::Watcher(const ConfigLoader& configLoader, std::function<void()> onConfigChange) :
-		configLoader(configLoader),
-		onConfigChange(std::move(onConfigChange)) {
+		configLoader{configLoader},
+		onConfigChange{std::move(onConfigChange)} {
 		// Trigger an initial event so that if the config has already changed we fire the callback immediately inline.
 		OnConfigFileEvent();
 
 		Log() << "Starting config watcher thread";
-		thread = std::thread([this] { RunThread(); });
+		thread = std::thread{[this] { RunThread(); }};
 	}
 
 	ConfigLoader::Watcher::~Watcher() noexcept(false) {
 		Log() << "Stopping config watcher";
 		{
-			std::scoped_lock lock(directoryMutex);
+			std::scoped_lock lock{directoryMutex};
 			if (directory != INVALID_HANDLE_VALUE) {
 				Log() << "Cancelling any pending config directory operations";
 				if (::CancelIoEx(directory, NULL) == 0)
@@ -201,7 +201,7 @@ namespace flexasio {
 
 		try {
 			OverlappedWithEvent overlapped;
-			std::vector<std::byte> fileNotifyInformationBuffer(64 * 1024);
+			std::vector<std::byte> fileNotifyInformationBuffer(64U * 1024U);
 			for (;;) {
 				TriggerConfigFileEventThenWait(&overlapped.overlapped, fileNotifyInformationBuffer);
 
@@ -211,7 +211,7 @@ namespace flexasio {
 				// Another reason to debounce is that it might make it less likely we'll run into file locking issues.
 				// We do this by sleeping for a while, and getting rid of all events that occurred in the mean time.
 				Log() << "Sleeping for debounce";
-				CheckStopRequested(/*waitFor=*/std::chrono::milliseconds(250));
+				CheckStopRequested(/*waitFor=*/std::chrono::milliseconds{250});
 			}
 		}
 		catch (StopRequested) {}
@@ -242,13 +242,13 @@ namespace flexasio {
 				throw std::system_error(::GetLastError(), std::system_category(), "Unable to open config directory for watching");
 
 			{
-				std::scoped_lock lock(directoryMutex);
+				std::scoped_lock lock{directoryMutex};
 				assert(directory == INVALID_HANDLE_VALUE);
 				directory = handle;
 			}
 			const auto directoryDeleter = [&](HANDLE handle) {
 				{
-					std::scoped_lock lock(directoryMutex);
+					std::scoped_lock lock{directoryMutex};
 					assert(directory == handle);
 					directory = INVALID_HANDLE_VALUE;
 				}
@@ -258,7 +258,7 @@ namespace flexasio {
 		}();
 
 		Log() << "Watching config directory";
-		for (bool first = true;; first = false) {
+		for (bool first{true};; first = false) {
 			// Note: we need to be careful about logging here - since the logfile is in the same directory as the config file,
 			// we could end up with directory change events entering an infinite feedback loop.
 
@@ -294,12 +294,12 @@ namespace flexasio {
 
 	bool ConfigLoader::Watcher::FileNotifyInformationContainsConfigFileEvents(std::span<const std::byte> fileNotifyInformationBuffer) {
 		for (;;) {
-			constexpr auto fileNotifyInformationHeaderSize = offsetof(FILE_NOTIFY_INFORMATION, FileName);
-			FILE_NOTIFY_INFORMATION fileNotifyInformationHeader;
-			const auto fileNotifyInformationHeaderBuffer = fileNotifyInformationBuffer.first(fileNotifyInformationHeaderSize);
+			constexpr auto fileNotifyInformationHeaderSize{offsetof(FILE_NOTIFY_INFORMATION, FileName)};
+			FILE_NOTIFY_INFORMATION fileNotifyInformationHeader{};
+			const auto fileNotifyInformationHeaderBuffer{fileNotifyInformationBuffer.first(fileNotifyInformationHeaderSize)};
 			memcpy(&fileNotifyInformationHeader, fileNotifyInformationHeaderBuffer.data(), fileNotifyInformationHeaderBuffer.size());
 
-			const auto fileNameBuffer = fileNotifyInformationBuffer.subspan(fileNotifyInformationHeaderSize, fileNotifyInformationHeader.FileNameLength);
+			const auto fileNameBuffer{fileNotifyInformationBuffer.subspan(fileNotifyInformationHeaderSize, fileNotifyInformationHeader.FileNameLength)};
 			std::wstring fileName(fileNameBuffer.size() / sizeof(wchar_t), 0);
 			memcpy(fileName.data(), fileNameBuffer.data(), fileNameBuffer.size());
 			if (fileName == configFileName) {
@@ -318,16 +318,16 @@ namespace flexasio {
 				}
 			}
 
-			if (fileNotifyInformationHeader.NextEntryOffset == 0) break;
+			if (fileNotifyInformationHeader.NextEntryOffset == 0U) break;
 			fileNotifyInformationBuffer = fileNotifyInformationBuffer.subspan(fileNotifyInformationHeader.NextEntryOffset);
 		}
 		return false;
 	}
 
 	ConfigLoader::Watcher::ConfigDirectoryWatchOperation::ConfigDirectoryWatchOperation(HANDLE directory, OVERLAPPED* overlapped, std::span<std::byte> fileNotifyInformationBuffer) :
-		directory(directory), overlapped(overlapped), fileNotifyInformationBuffer(fileNotifyInformationBuffer) {
+		directory{directory}, overlapped{overlapped}, fileNotifyInformationBuffer{fileNotifyInformationBuffer} {
 		assert(overlapped != nullptr);
-		assert(reinterpret_cast<std::uintptr_t>(fileNotifyInformationBuffer.data()) % sizeof(DWORD) == 0);
+		assert(reinterpret_cast<std::uintptr_t>(fileNotifyInformationBuffer.data()) % sizeof(DWORD) == 0U);
 		if (::ReadDirectoryChangesW(
 			directory,
 			fileNotifyInformationBuffer.data(), DWORD(fileNotifyInformationBuffer.size()),
@@ -353,30 +353,30 @@ namespace flexasio {
 	ConfigLoader::Watcher::ConfigDirectoryWatchOperation::Outcome ConfigLoader::Watcher::ConfigDirectoryWatchOperation::Await() {
 		assert(overlapped != nullptr);
 
-		DWORD size;
-		const auto result = ::GetOverlappedResult(directory, overlapped, &size, /*bWait=*/TRUE);
+		DWORD size{};
+		const auto result{::GetOverlappedResult(directory, overlapped, &size, /*bWait=*/TRUE)};
 		overlapped = nullptr;
 		if (result == 0) {
 			const auto error = ::GetLastError();
 			if (error == ERROR_OPERATION_ABORTED) {
 				Log() << "Directory watch operation was aborted";
-				return Aborted();
+				return Aborted{};
 			}
 			throw std::system_error(::GetLastError(), std::system_category(), "GetOverlappedResult() failed");
 		}
-		if (size < 0 || size > fileNotifyInformationBuffer.size())
+		if (size > fileNotifyInformationBuffer.size())
 			throw std::system_error(::GetLastError(), std::system_category(), "ReadDirectoryChangesW() produced invalid size: " + std::to_string(size));
-		return size > 0 ? Outcome(std::span(fileNotifyInformationBuffer).first(size)) : Outcome(Overflow());
+		return size > 0U ? Outcome{std::span{fileNotifyInformationBuffer}.first(size)} : Outcome{Overflow{}};
 	}
 
 	ConfigLoader::ConfigLoader() :
-		configDirectory(GetUserDirectory()),
-		initialConfig(LoadConfig(configDirectory / configFileName)) {}
+		configDirectory{GetUserDirectory()},
+		initialConfig{LoadConfig(configDirectory / configFileName)} {}
 
 	void ConfigLoader::Watcher::OnConfigFileEvent() {
 		Log() << "Handling config file event";
 
-		Config newConfig;
+		Config newConfig{};
 		try {
 			newConfig = LoadConfig(configLoader.configDirectory / configFileName);
 		}

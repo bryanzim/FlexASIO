@@ -29,12 +29,12 @@ namespace flexasio {
 	namespace {
 
 		std::wstring WidenDeviceName(const char* const name) {
-			if (name == nullptr || name[0] == '\0') return {};
+			if (name == nullptr || name[0U] == '\0') return {};
 			try {
 				return ConvertFromUTF8(name);
 			}
 			catch (const std::exception&) {
-				const auto size = MultiByteToWideChar(CP_ACP, 0, name, -1, nullptr, 0);
+				const auto size{MultiByteToWideChar(CP_ACP, 0U, name, -1, nullptr, 0)};
 				if (size <= 1) return {};
 				std::wstring result(static_cast<size_t>(size - 1), 0);
 				MultiByteToWideChar(CP_ACP, 0, name, -1, result.data(), size);
@@ -46,14 +46,14 @@ namespace flexasio {
 
 	FlexASIO::PortAudioHandle::PortAudioHandle() {
 		Log() << "Initializing PortAudio";
-		PaError error = Pa_Initialize();
+		PaError error{Pa_Initialize()};
 		if (error != paNoError)
 			throw ASIOException(ASE_HWMalfunction, std::string("could not initialize PortAudio: ") + Pa_GetErrorText(error));
 		Log() << "PortAudio initialization successful";
 	}
 	FlexASIO::PortAudioHandle::~PortAudioHandle() {
 		Log() << "Terminating PortAudio";
-		PaError error = Pa_Terminate();
+		PaError error{Pa_Terminate()};
 		if (error != paNoError)
 			Log() << "PortAudio termination failed with " << Pa_GetErrorText(error);
 		else
@@ -62,11 +62,11 @@ namespace flexasio {
 
 	FlexASIO::Win32HighResolutionTimer::Win32HighResolutionTimer() {
 		Log() << "Starting high resolution timer";
-		timeBeginPeriod(1);
+		timeBeginPeriod(1U);
 	}
 	FlexASIO::Win32HighResolutionTimer::~Win32HighResolutionTimer() {
 		Log() << "Stopping high resolution timer";
-		timeEndPeriod(1);
+		timeEndPeriod(1U);
 	}
 
 	DWORD FlexASIO::Win32HighResolutionTimer::GetTimeMilliseconds() const { return timeGetTime(); }
@@ -80,15 +80,15 @@ namespace flexasio {
 		}
 
 		void LogPortAudioApiList() {
-			const auto pa_api_count = Pa_GetHostApiCount();
-			for (PaHostApiIndex pa_api_index = 0; pa_api_index < pa_api_count; ++pa_api_index) {
-				Log() << "Found backend: " << HostApi(pa_api_index);
+			const auto pa_api_count{Pa_GetHostApiCount()};
+			for (PaHostApiIndex pa_api_index{0}; pa_api_index < pa_api_count; ++pa_api_index) {
+				Log() << "Found backend: " << HostApi{pa_api_index};
 			}
 		}
 		void LogPortAudioDeviceList() {
-			const auto deviceCount = Pa_GetDeviceCount();
-			for (PaDeviceIndex deviceIndex = 0; deviceIndex < deviceCount; ++deviceIndex) {
-				Log() << "Found device: " << Device(deviceIndex);
+			const auto deviceCount{Pa_GetDeviceCount()};
+			for (PaDeviceIndex deviceIndex{0}; deviceIndex < deviceCount; ++deviceIndex) {
+				Log() << "Found device: " << Device{deviceIndex};
 			}
 		}
 
@@ -97,24 +97,24 @@ namespace flexasio {
 			// The default API used by PortAudio is MME.
 			// It works, but DirectSound seems like the best default (it reports a more sensible number of channels, for example).
 			// So let's try that first, and fall back to whatever the PortAudio default is if DirectSound is not available somehow.
-			auto hostApiIndex = Pa_HostApiTypeIdToHostApiIndex(paDirectSound);
+			auto hostApiIndex{Pa_HostApiTypeIdToHostApiIndex(paDirectSound)};
 			if (hostApiIndex == paHostApiNotFound)
 				hostApiIndex = Pa_GetDefaultHostApi();
 			if (hostApiIndex < 0)
 				throw std::runtime_error("Unable to get default PortAudio host API");
-			return HostApi(hostApiIndex);
+			return HostApi{hostApiIndex};
 		}
 
 		HostApi SelectHostApiByName(std::string_view name) {
 			Log() << "Searching for a PortAudio host API named '" << name << "'";
-			const auto hostApiCount = Pa_GetHostApiCount();
+			const auto hostApiCount{Pa_GetHostApiCount()};
 
-			for (PaHostApiIndex hostApiIndex = 0; hostApiIndex < hostApiCount; ++hostApiIndex) {
-				const HostApi hostApi(hostApiIndex);
+			for (PaHostApiIndex hostApiIndex{0}; hostApiIndex < hostApiCount; ++hostApiIndex) {
+				const HostApi hostApi{hostApiIndex};
 				// TODO: the comparison should be case insensitive.
 				if (hostApi.info.name == name) return hostApi;
 			}
-			throw std::runtime_error(std::string("PortAudio host API '") + std::string(name) + "' not found");
+			throw std::runtime_error{std::string{"PortAudio host API '"} + std::string{name} + "' not found"};
 		}
 
 		std::optional<Device> SelectDevice(const PaHostApiIndex hostApiIndex, const PaDeviceIndex defaultDeviceIndex, const Config::Device& configDevice, const int minimumInputChannelCount, const int minimumOutputChannelCount) {
@@ -126,44 +126,44 @@ namespace flexasio {
 					return std::nullopt;
 				}
 				Log() << "Using default device with index " << defaultDeviceIndex;
-				const Device device(defaultDeviceIndex);
+				const Device device{defaultDeviceIndex};
 				if (device.info.maxInputChannels < minimumInputChannelCount || device.info.maxOutputChannels < minimumOutputChannelCount) {
 					Log() << "Cannot use default device " << device << " because we need at least " << minimumInputChannelCount << " input channels and " << minimumOutputChannelCount << " output channels";
 					return std::nullopt;
 				}
-				return Device(defaultDeviceIndex);
+				return Device{defaultDeviceIndex};
 			}
 			if (std::holds_alternative<Config::NoDevice>(configDevice)) {
 				Log() << "Device explicitly disabled in configuration";
 				return std::nullopt;
 			}
 
-			const auto configName = std::get_if<std::string>(&configDevice);
-			const auto configRegex = std::get_if<Config::DeviceRegex>(&configDevice);
+			const auto configName{std::get_if<std::string>(&configDevice)};
+			const auto configRegex{std::get_if<Config::DeviceRegex>(&configDevice)};
 
-			std::string matchDescription;
+			std::string matchDescription{};
 			if (configName != nullptr) matchDescription = "named `" + *configName + "`";
 			if (configRegex != nullptr) matchDescription = "whose name matches regex `" + configRegex->getString() + "`";
 			Log() << "Searching for a PortAudio device " << matchDescription;
 
-			std::optional<Device> foundDevice;
-			const auto deviceCount = Pa_GetDeviceCount();
-			for (PaDeviceIndex deviceIndex = 0; deviceIndex < deviceCount; ++deviceIndex) {
-				Device device(deviceIndex);
+			std::optional<Device> foundDevice{};
+			const auto deviceCount{Pa_GetDeviceCount()};
+			for (PaDeviceIndex deviceIndex{0}; deviceIndex < deviceCount; ++deviceIndex) {
+				Device device{deviceIndex};
 				if (device.info.hostApi != hostApiIndex || device.info.maxInputChannels < minimumInputChannelCount || device.info.maxOutputChannels < minimumOutputChannelCount) continue;
 
-				const auto& name = device.info.name;
+				const auto& name{device.info.name};
 				if (configName != nullptr && name != *configName) continue;
 				if (configRegex != nullptr && !std::regex_search(name, configRegex->getRegex())) continue;
 
 				Log() << "Found a match with device " << device.index;
 				if (foundDevice.has_value())
-					throw std::runtime_error(std::string("Device search found more than one device: `") + foundDevice->info.name + "` and `" + name + "` (minimum channel count: " + std::to_string(minimumInputChannelCount) + " input, " + std::to_string(minimumOutputChannelCount) + " output)");
+					throw std::runtime_error{std::string{"Device search found more than one device: `"} + foundDevice->info.name + "` and `" + name + "` (minimum channel count: " + std::to_string(minimumInputChannelCount) + " input, " + std::to_string(minimumOutputChannelCount) + " output)"};
 				foundDevice.emplace(device);
 			}
 			if (!foundDevice.has_value()) {
 				Log() << "No matching devices found";
-				throw std::runtime_error(std::string("Unable to find a PortAudio device ") + matchDescription + " within specified backend (minimum channel count : " + std::to_string(minimumInputChannelCount) + " input, " + std::to_string(minimumOutputChannelCount) + " output)");
+				throw std::runtime_error{std::string{"Unable to find a PortAudio device "} + matchDescription + " within specified backend (minimum channel count : " + std::to_string(minimumInputChannelCount) + " input, " + std::to_string(minimumOutputChannelCount) + " output)"};
 			}
 			return *foundDevice;
 		}
@@ -186,7 +186,7 @@ namespace flexasio {
 				return *previousSampleRate;
 			}
 
-			ASIOSampleRate sampleRate = 0;
+			ASIOSampleRate sampleRate{0};
 			if (inputDevice.has_value()) {
 				sampleRate = (std::max)(sampleRate, inputDevice->info.defaultSampleRate);
 			}
@@ -200,7 +200,7 @@ namespace flexasio {
 
 		long Message(decltype(ASIOCallbacks::asioMessage) asioMessage, long selector, long value, void* message, double* opt) {
 			Log() << "Sending message: selector = " << ::dechamps_ASIOUtil::GetASIOMessageSelectorString(selector) << ", value = " << value << ", message = " << message << ", opt = " << opt;
-			const auto result = asioMessage(selector, value, message, opt);
+			const auto result{asioMessage(selector, value, message, opt)};
 			Log() << "Result: " << result;
 			return result;
 		}
@@ -233,8 +233,8 @@ namespace flexasio {
 		}
 
 		long GetBufferInfosChannelCount(const ASIOBufferInfo* asioBufferInfos, const long numChannels, const bool input) {
-			long result = 0;
-			for (long channelIndex = 0; channelIndex < numChannels; ++channelIndex)
+			long result{0};
+			for (long channelIndex{0}; channelIndex < numChannels; ++channelIndex)
 				if (!asioBufferInfos[channelIndex].isInput == !input)
 					++result;
 			return result;
@@ -265,10 +265,10 @@ namespace flexasio {
 
 	}
 
-	constexpr FlexASIO::SampleType FlexASIO::float32 = { ::dechamps_cpputil::endianness == ::dechamps_cpputil::Endianness::LITTLE ? ASIOSTFloat32LSB : ASIOSTFloat32MSB, paFloat32, 4, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT };
-	constexpr FlexASIO::SampleType FlexASIO::int32 = { ::dechamps_cpputil::endianness == ::dechamps_cpputil::Endianness::LITTLE ? ASIOSTInt32LSB : ASIOSTInt32MSB, paInt32, 4, KSDATAFORMAT_SUBTYPE_PCM };
-	constexpr FlexASIO::SampleType FlexASIO::int24 = { ::dechamps_cpputil::endianness == ::dechamps_cpputil::Endianness::LITTLE ? ASIOSTInt24LSB : ASIOSTInt24MSB, paInt24, 3, KSDATAFORMAT_SUBTYPE_PCM };
-	constexpr FlexASIO::SampleType FlexASIO::int16 = { ::dechamps_cpputil::endianness == ::dechamps_cpputil::Endianness::LITTLE ? ASIOSTInt16LSB : ASIOSTInt16MSB, paInt16, 2, KSDATAFORMAT_SUBTYPE_PCM };
+	constexpr FlexASIO::SampleType FlexASIO::float32{::dechamps_cpputil::endianness == ::dechamps_cpputil::Endianness::LITTLE ? ASIOSTFloat32LSB : ASIOSTFloat32MSB, paFloat32, 4U, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT};
+	constexpr FlexASIO::SampleType FlexASIO::int32{::dechamps_cpputil::endianness == ::dechamps_cpputil::Endianness::LITTLE ? ASIOSTInt32LSB : ASIOSTInt32MSB, paInt32, 4U, KSDATAFORMAT_SUBTYPE_PCM};
+	constexpr FlexASIO::SampleType FlexASIO::int24{::dechamps_cpputil::endianness == ::dechamps_cpputil::Endianness::LITTLE ? ASIOSTInt24LSB : ASIOSTInt24MSB, paInt24, 3U, KSDATAFORMAT_SUBTYPE_PCM};
+	constexpr FlexASIO::SampleType FlexASIO::int16{::dechamps_cpputil::endianness == ::dechamps_cpputil::Endianness::LITTLE ? ASIOSTInt16LSB : ASIOSTInt16MSB, paInt16, 2U, KSDATAFORMAT_SUBTYPE_PCM};
 	constexpr std::pair<std::string_view, FlexASIO::SampleType> FlexASIO::sampleTypes[] = {
 			{"Float32", float32},
 			{"Int32", int32},
@@ -277,19 +277,19 @@ namespace flexasio {
 	};
 
 	FlexASIO::SampleType FlexASIO::ParseSampleType(const std::string_view str) {
-		const auto sampleType = ::dechamps_cpputil::Find(str, sampleTypes);
+		const auto sampleType{::dechamps_cpputil::Find(str, sampleTypes)};
 		if (!sampleType.has_value()) {
-			throw std::runtime_error(std::string("Invalid '") + std::string(str) + "' sample type - valid values are " + ::dechamps_cpputil::Join(sampleTypes, ", ", [](const auto& item) { return std::string("'") + std::string(item.first) + "'"; }));
+			throw std::runtime_error{std::string{"Invalid '"} + std::string{str} + "' sample type - valid values are " + ::dechamps_cpputil::Join(sampleTypes, ", ", [](const auto& item) { return std::string{"'"} + std::string{item.first} + "'"; })};
 		}
 		return *sampleType;
 	}
 
 	FlexASIO::SampleType FlexASIO::WaveFormatToSampleType(const WAVEFORMATEXTENSIBLE& waveFormat) {
-		const auto validBitsPerSample = waveFormat.Samples.wValidBitsPerSample != 0 ? waveFormat.Samples.wValidBitsPerSample : waveFormat.Format.wBitsPerSample;
+		const auto validBitsPerSample{waveFormat.Samples.wValidBitsPerSample != 0U ? waveFormat.Samples.wValidBitsPerSample : waveFormat.Format.wBitsPerSample};
 		for (const auto& [name, sampleType] : sampleTypes) {
-			if (sampleType.waveSubFormat == waveFormat.SubFormat && sampleType.size * 8 == validBitsPerSample) return sampleType;
+			if (sampleType.waveSubFormat == waveFormat.SubFormat && sampleType.size * 8U == validBitsPerSample) return sampleType;
 		}
-		throw std::runtime_error(std::string("Unable to convert wave format to sample type: ") + DescribeWaveFormat(waveFormat));
+		throw std::runtime_error{std::string{"Unable to convert wave format to sample type: "} + DescribeWaveFormat(waveFormat)};
 	}
 
 	FlexASIO::SampleType FlexASIO::SelectSampleType(const PaHostApiTypeId hostApiTypeId, const Device& device, const Config::Stream& streamConfig) {
@@ -300,7 +300,7 @@ namespace flexasio {
 		if (hostApiTypeId == paWASAPI && streamConfig.wasapiExclusiveMode) {
 			try {
 				Log() << "WASAPI Exclusive mode detected, selecting sample type from WASAPI device default format";
-				const auto deviceFormat = GetWasapiDeviceDefaultFormat(device.index);
+				const auto deviceFormat{GetWasapiDeviceDefaultFormat(device.index)};
 				Log() << "WASAPI device default format: " << DescribeWaveFormat(deviceFormat);
 				return WaveFormatToSampleType(deviceFormat);
 			}
@@ -315,11 +315,11 @@ namespace flexasio {
 	DWORD FlexASIO::SelectChannelMask(const PaHostApiTypeId hostApiTypeId, const Device& device, const Config::Stream& streamConfig) {
 		if (streamConfig.channels.has_value()) {
 			Log() << "Not using a channel mask because channel count is set in configuration";
-			return 0;
+			return 0U;
 		}
 		if (hostApiTypeId != paWASAPI) {
 			Log() << "Not using a channel mask because not using WASAPI";
-			return 0;
+			return 0U;
 		}
 		try {
 			// The default channel count is the max channel count that PortAudio advertises, which
@@ -327,13 +327,13 @@ namespace flexasio {
 			// to be consistent. Sadly, this holds even if we eventually decide to open the device in
 			// exclusive mode.
 			Log() << "Selecting channel mask from WASAPI device mix format";
-			const auto deviceFormat = GetWasapiDeviceMixFormat(device.index);
+			const auto deviceFormat{GetWasapiDeviceMixFormat(device.index)};
 			Log() << "WASAPI device mix format: " << DescribeWaveFormat(deviceFormat);
 			return deviceFormat.dwChannelMask;
 		}
 		catch (const std::exception& exception) {
 			Log() << "Unable to select channel mask from WASAPI device mix format: " << exception.what();
-			return 0;
+			return 0U;
 		}
 	}
 
@@ -342,7 +342,7 @@ namespace flexasio {
 	}
 
 	FlexASIO::FlexASIO(void* sysHandle) :
-		windowHandle(reinterpret_cast<decltype(windowHandle)>(sysHandle)),
+		windowHandle{reinterpret_cast<decltype(windowHandle)>(sysHandle)},
 	portAudioDebugRedirector([](std::string_view str) { if (IsLoggingEnabled()) Log() << "[PortAudio] " << str; }),
 	hostApi([&] {
 		LogPortAudioApiList();
@@ -390,32 +390,32 @@ namespace flexasio {
 		}
 	}()),
 		inputChannelMask([&]() -> DWORD {
-		if (!inputDevice.has_value()) return 0;
+		if (!inputDevice.has_value()) return 0U;
 		try {
 			Log() << "Selecting input channel mask";
-			const auto channelMask = SelectChannelMask(hostApi.info.type, *inputDevice, config.input);
+			const auto channelMask{SelectChannelMask(hostApi.info.type, *inputDevice, config.input)};
 			Log() << "Selected input channel mask: " << GetWaveFormatChannelMaskString(channelMask);
 			return channelMask;
 		}
 		catch (const std::exception& exception) {
-			throw std::runtime_error(std::string("Could not select input channel mask: ") + exception.what());
-			return 0;
+			throw std::runtime_error{std::string{"Could not select input channel mask: "} + exception.what()};
+			return 0U;
 		}
 	}()),
 		outputChannelMask([&]() -> DWORD {
-		if (!outputDevice.has_value()) return 0;
+		if (!outputDevice.has_value()) return 0U;
 		try {
 			Log() << "Selecting output channel mask";
-			const auto channelMask = SelectChannelMask(hostApi.info.type, *outputDevice, config.output);
+			const auto channelMask{SelectChannelMask(hostApi.info.type, *outputDevice, config.output)};
 			Log() << "Selected output channel mask: " << GetWaveFormatChannelMaskString(channelMask);
 			return channelMask;
 		}
 		catch (const std::exception& exception) {
-			throw std::runtime_error(std::string("Could not select output channel mask: ") + exception.what());
-			return 0;
+			throw std::runtime_error{std::string{"Could not select output channel mask: "} + exception.what()};
+			return 0U;
 		}
 	}()),
-		sampleRate(GetDefaultSampleRate(inputDevice, outputDevice))
+		sampleRate{GetDefaultSampleRate(inputDevice, outputDevice)}
 	{
 		Log() << "sysHandle = " << sysHandle;
 
@@ -443,7 +443,7 @@ namespace flexasio {
 
 	FlexASIO::BufferSizes FlexASIO::ComputeBufferSizes() const
 	{
-		BufferSizes bufferSizes;
+		BufferSizes bufferSizes{};
 		if (config.bufferSizeSamples.has_value()) {
 			Log() << "Using buffer size " << *config.bufferSizeSamples << " from configuration";
 			bufferSizes.minimum = bufferSizes.maximum = bufferSizes.preferred = long(*config.bufferSizeSamples);
@@ -484,11 +484,11 @@ namespace flexasio {
 		std::string getChannelName(size_t channel, DWORD channelMask)
 		{
 			// Search for the matching bit in channelMask
-			size_t current_channel = 0;
-			DWORD current_channel_speaker = 1;
+			size_t current_channel{0U};
+			DWORD current_channel_speaker{1U};
 			for (;;)
 			{
-				while ((current_channel_speaker & channelMask) == 0 && current_channel_speaker < SPEAKER_ALL)
+				while ((current_channel_speaker & channelMask) == 0U && current_channel_speaker < SPEAKER_ALL)
 					current_channel_speaker <<= 1;
 				if (current_channel_speaker == SPEAKER_ALL)
 					break;
@@ -499,13 +499,13 @@ namespace flexasio {
 				current_channel_speaker <<= 1;
 			}
 
-			std::stringstream channel_name;
+			std::stringstream channel_name{};
 			channel_name << channel;
 			if (current_channel_speaker == SPEAKER_ALL)
 				Log() << "Channel " << channel << " is outside channel mask " << channelMask;
 			else
 			{
-				const char* pretty_name = nullptr;
+				const char* pretty_name{nullptr};
 				switch (current_channel_speaker)
 				{
 				case SPEAKER_FRONT_LEFT: pretty_name = "FL (Front Left)"; break;
@@ -553,9 +553,9 @@ namespace flexasio {
 		info->isActive = preparedState.has_value() && preparedState->IsChannelActive(info->isInput, info->channel);
 		info->channelGroup = 0;
 		info->type = info->isInput ? inputSampleType->asio : outputSampleType->asio;
-		std::stringstream channel_string;
+		std::stringstream channel_string{};
 		channel_string << (info->isInput ? "IN" : "OUT") << " " << getChannelName(info->channel, info->isInput ? inputChannelMask : outputChannelMask);
-		strcpy_s(info->name, 32, channel_string.str().c_str());
+		strcpy_s(info->name, 32U, channel_string.str().c_str());
 		Log() << "Returning: " << info->name << ", " << (info->isActive ? "active" : "inactive") << ", group " << info->channelGroup << ", type " << ::dechamps_ASIOUtil::GetASIOSampleTypeString(info->type);
 	}
 
@@ -564,7 +564,7 @@ namespace flexasio {
 	{
 		Log() << "FlexASIO::WithStreamParameters(inputEnabled = " << inputEnabled << ", outputEnabled = " << outputEnabled << ", sampleRate = " << sampleRate << ")";
 
-		auto exclusivity = hostApi.info.type == paWDMKS ? StreamExclusivity::EXCLUSIVE : StreamExclusivity::SHARED;
+		auto exclusivity{hostApi.info.type == paWDMKS ? StreamExclusivity::EXCLUSIVE : StreamExclusivity::SHARED};
 
 		PaStreamParameters common_parameters {};
 		common_parameters.sampleFormat = paNonInterleaved;
@@ -575,12 +575,12 @@ namespace flexasio {
 		if (hostApi.info.type == paWASAPI) {
 			common_wasapi_stream_info.size = sizeof(common_wasapi_stream_info);
 			common_wasapi_stream_info.hostApiType = paWASAPI;
-			common_wasapi_stream_info.version = 1;
-			common_wasapi_stream_info.flags = 0;
+			common_wasapi_stream_info.version = 1U;
+			common_wasapi_stream_info.flags = 0U;
 		}
 
-		PaStreamParameters input_parameters = common_parameters;
-		PaWasapiStreamInfo input_wasapi_stream_info = common_wasapi_stream_info;
+		PaStreamParameters input_parameters{common_parameters};
+		PaWasapiStreamInfo input_wasapi_stream_info{common_wasapi_stream_info};
 		if (inputEnabled)
 		{
 			input_parameters.device = inputDevice->index;
@@ -589,7 +589,7 @@ namespace flexasio {
 			if (config.input.suggestedLatencySeconds.has_value()) input_parameters.suggestedLatency = *config.input.suggestedLatencySeconds;
 			if (hostApi.info.type == paWASAPI)
 			{
-				if (inputChannelMask != 0)
+				if (inputChannelMask != 0U)
 				{
 					input_wasapi_stream_info.flags |= paWinWasapiUseChannelMask;
 					input_wasapi_stream_info.channelMask = inputChannelMask;
@@ -611,8 +611,8 @@ namespace flexasio {
 			}
 		}
 
-		PaStreamParameters output_parameters = common_parameters;
-		PaWasapiStreamInfo output_wasapi_stream_info = common_wasapi_stream_info;
+		PaStreamParameters output_parameters{common_parameters};
+		PaWasapiStreamInfo output_wasapi_stream_info{common_wasapi_stream_info};
 		if (outputEnabled)
 		{
 			output_parameters.device = outputDevice->index;
@@ -621,7 +621,7 @@ namespace flexasio {
 			if (config.output.suggestedLatencySeconds.has_value()) output_parameters.suggestedLatency = *config.output.suggestedLatencySeconds;
 			if (hostApi.info.type == paWASAPI)
 			{
-				if (outputChannelMask != 0)
+				if (outputChannelMask != 0U)
 				{
 					output_wasapi_stream_info.flags |= paWinWasapiUseChannelMask;
 					output_wasapi_stream_info.channelMask = outputChannelMask;
@@ -653,9 +653,9 @@ namespace flexasio {
 	Stream FlexASIO::OpenStream(const StreamParameters& streamParameters, unsigned long framesPerBuffer, PaStreamCallback callback, void* callbackUserData) const
 	{
 		Log() << "FlexASIO::OpenStream(framesPerBuffer = " << framesPerBuffer << ", callback = " << callback << ", callbackUserData = " << callbackUserData << ")";
-		auto stream = flexasio::OpenStream(
-			streamParameters, framesPerBuffer, paPrimeOutputBuffersUsingStreamCallback, callback, callbackUserData);
-		const auto streamInfo = Pa_GetStreamInfo(stream.get());
+		auto stream{flexasio::OpenStream(
+			streamParameters, framesPerBuffer, paPrimeOutputBuffersUsingStreamCallback, callback, callbackUserData)};
+		const auto streamInfo{Pa_GetStreamInfo(stream.get())};
 		if (streamInfo == nullptr) {
 			Log() << "Unable to get stream info";
 		}
@@ -680,7 +680,7 @@ namespace flexasio {
 
 		// We do not know whether the host application intends to use only input channels, only output channels, or both.
 		// This logic ensures the driver is usable for all three use cases.
-		bool available = false;
+		bool available{false};
 		if (inputDevice.has_value())
 			try {
 				Log() << "Checking if input supports this sample rate";
@@ -754,7 +754,7 @@ namespace flexasio {
 	}
 
 	FlexASIO::PreparedState::Buffers::Buffers(size_t bufferSetCount, size_t inputChannelCount, size_t outputChannelCount, size_t bufferSizeInFrames, size_t inputSampleSizeInBytes, size_t outputSampleSizeInBytes) :
-		bufferSetCount(bufferSetCount), inputChannelCount(inputChannelCount), outputChannelCount(outputChannelCount), bufferSizeInFrames(bufferSizeInFrames), inputSampleSizeInBytes(inputSampleSizeInBytes), outputSampleSizeInBytes(outputSampleSizeInBytes),
+		bufferSetCount{bufferSetCount}, inputChannelCount{inputChannelCount}, outputChannelCount{outputChannelCount}, bufferSizeInFrames{bufferSizeInFrames}, inputSampleSizeInBytes{inputSampleSizeInBytes}, outputSampleSizeInBytes{outputSampleSizeInBytes},
 		buffers(bufferSetCount * bufferSizeInFrames * (inputChannelCount * inputSampleSizeInBytes + outputChannelCount * outputSampleSizeInBytes)) {
 		Log() << "Allocated "
 			<< bufferSetCount << " buffer sets, "
@@ -769,18 +769,18 @@ namespace flexasio {
 	}
 
 	FlexASIO::PreparedState::PreparedState(FlexASIO& flexASIO, ASIOSampleRate sampleRate, ASIOBufferInfo* asioBufferInfos, long numChannels, long bufferSizeInFrames, ASIOCallbacks* callbacks) :
-		flexASIO(flexASIO), sampleRate(sampleRate), callbacks(*callbacks),
-		buffers(
-			2,
-			GetBufferInfosChannelCount(asioBufferInfos, numChannels, true), GetBufferInfosChannelCount(asioBufferInfos, numChannels, false),
-			bufferSizeInFrames,
-			flexASIO.inputSampleType.has_value() ? flexASIO.inputSampleType->size : 0, flexASIO.outputSampleType.has_value() ? flexASIO.outputSampleType->size : 0),
+		flexASIO{flexASIO}, sampleRate{sampleRate}, callbacks{*callbacks},
+		buffers{
+			2U,
+			static_cast<size_t>(GetBufferInfosChannelCount(asioBufferInfos, numChannels, true)), static_cast<size_t>(GetBufferInfosChannelCount(asioBufferInfos, numChannels, false)),
+			static_cast<size_t>(bufferSizeInFrames),
+			flexASIO.inputSampleType.has_value() ? flexASIO.inputSampleType->size : 0U, flexASIO.outputSampleType.has_value() ? flexASIO.outputSampleType->size : 0U},
 		bufferInfos([&] {
-		std::vector<ASIOBufferInfo> bufferInfos;
+		std::vector<ASIOBufferInfo> bufferInfos{};
 		bufferInfos.reserve(numChannels);
-		size_t nextBuffersInputChannelIndex = 0;
-		size_t nextBuffersOutputChannelIndex = 0;
-		for (long channelIndex = 0; channelIndex < numChannels; ++channelIndex)
+		size_t nextBuffersInputChannelIndex{0U};
+		size_t nextBuffersOutputChannelIndex{0U};
+		for (long channelIndex{0}; channelIndex < numChannels; ++channelIndex)
 		{
 			ASIOBufferInfo& asioBufferInfo = asioBufferInfos[channelIndex];
 			if (asioBufferInfo.isInput)
@@ -793,15 +793,15 @@ namespace flexasio {
 				if (asioBufferInfo.channelNum < 0 || asioBufferInfo.channelNum >= flexASIO.GetOutputChannelCount())
 					throw ASIOException(ASE_InvalidParameter, "out of bounds output channel in createBuffers() buffer info");
 			}
-			const auto getBuffer = asioBufferInfo.isInput ? &Buffers::GetInputBuffer : &Buffers::GetOutputBuffer;
-			auto& nextBuffersChannelIndex = asioBufferInfo.isInput ? nextBuffersInputChannelIndex : nextBuffersOutputChannelIndex;
-			const auto bufferSizeInBytes = asioBufferInfo.isInput ? buffers.GetInputBufferSizeInBytes() : buffers.GetOutputBufferSizeInBytes();
+			const auto getBuffer{asioBufferInfo.isInput ? &Buffers::GetInputBuffer : &Buffers::GetOutputBuffer};
+			auto& nextBuffersChannelIndex{asioBufferInfo.isInput ? nextBuffersInputChannelIndex : nextBuffersOutputChannelIndex};
+			const auto bufferSizeInBytes{asioBufferInfo.isInput ? buffers.GetInputBufferSizeInBytes() : buffers.GetOutputBufferSizeInBytes()};
 
-			std::byte* first_half = (buffers.*getBuffer)(0, nextBuffersChannelIndex);
-			std::byte* second_half = (buffers.*getBuffer)(1, nextBuffersChannelIndex);
+			std::byte* first_half{(buffers.*getBuffer)(0U, nextBuffersChannelIndex)};
+			std::byte* second_half{(buffers.*getBuffer)(1U, nextBuffersChannelIndex)};
 			++nextBuffersChannelIndex;
-			asioBufferInfo.buffers[0] = first_half;
-			asioBufferInfo.buffers[1] = second_half;
+			asioBufferInfo.buffers[0U] = first_half;
+			asioBufferInfo.buffers[1U] = second_half;
 			Log() << "ASIO buffer #" << channelIndex << " is " << (asioBufferInfo.isInput ? "input" : "output") << " channel " << asioBufferInfo.channelNum
 				<< " - first half: " << first_half << "-" << first_half + bufferSizeInBytes
 				<< " - second half: " << second_half << "-" << second_half + bufferSizeInBytes;
@@ -809,7 +809,7 @@ namespace flexasio {
 		}
 		return bufferInfos;
 		}()), streamWithExclusivity(flexASIO.WithStreamParameters(
-			buffers.inputChannelCount > 0, buffers.outputChannelCount > 0, sampleRate, GetDefaultSuggestedLatency(bufferSizeInFrames, sampleRate),
+			buffers.inputChannelCount > 0U, buffers.outputChannelCount > 0U, sampleRate, GetDefaultSuggestedLatency(bufferSizeInFrames, sampleRate),
 			[&](const StreamParameters& streamParameters, StreamExclusivity streamExclusivity) {
 				return StreamWithExclusivity{
 					.stream = flexASIO.OpenStream(streamParameters, static_cast<unsigned long>(bufferSizeInFrames), &PreparedState::StreamCallback, this),
@@ -845,7 +845,7 @@ namespace flexasio {
 
 	long FlexASIO::ComputeLatencyFromStream(PaStream* stream, bool output, size_t bufferSizeInFrames) const
 	{
-		const PaStreamInfo* stream_info = Pa_GetStreamInfo(stream);
+		const PaStreamInfo* stream_info{Pa_GetStreamInfo(stream)};
 		if (!stream_info) throw ASIOException(ASE_HWMalfunction, "unable to get stream info");
 
 		// See https://github.com/dechamps/FlexASIO/issues/10.
@@ -862,7 +862,7 @@ namespace flexasio {
 			// applications rely on it - see https://github.com/dechamps/FlexASIO/issues/122.
 			Log() << "GetLatencies() called before CreateBuffers() - attempting to probe streams";
 
-			const auto bufferSize = ComputeBufferSizes().preferred;
+			const auto bufferSize{ComputeBufferSizes().preferred};
 			Log() << "Assuming " << bufferSize << " as the buffer size";
 
 			// Since CreateBuffers() has not been called yet, we do not know if the application intends
@@ -925,19 +925,19 @@ namespace flexasio {
 	}
 
 	FlexASIO::PreparedState::RunningState::RunningState(PreparedState& preparedState) :
-		preparedState(preparedState),
+		preparedState{preparedState},
 		host_supports_timeinfo([&] {
 		Log() << "Checking if the host supports time info";
-		const bool result = preparedState.callbacks.asioMessage &&
+		const bool result{preparedState.callbacks.asioMessage &&
 			Message(preparedState.callbacks.asioMessage, kAsioSelectorSupported, kAsioSupportsTimeInfo, NULL, NULL) == 1 &&
-			Message(preparedState.callbacks.asioMessage, kAsioSupportsTimeInfo, 0, NULL, NULL) == 1;
+			Message(preparedState.callbacks.asioMessage, kAsioSupportsTimeInfo, 0, NULL, NULL) == 1};
 		Log() << "The host " << (result ? "supports" : "does not support") << " time info";
 		return result;
 	}()),
 		outputReadyState([&]() -> std::optional<std::atomic<OutputReadyState>> {
 		if (preparedState.flexASIO.hostSupportsOutputReady) return OutputReadyState::READY; else return std::nullopt;
 	}()) {
-		LARGE_INTEGER frequency;
+		LARGE_INTEGER frequency{};
 		if (QueryPerformanceFrequency(&frequency)) qpcFrequency = frequency.QuadPart;
 		try {
 			streamStatus.emplace(preparedState.MakeStreamStatusDescription());
@@ -987,7 +987,7 @@ namespace flexasio {
 
 	int FlexASIO::PreparedState::StreamCallback(const void *input, void *output, unsigned long frameCount, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData) throw() {
 		if (IsLoggingEnabled()) Log() << "--- ENTERING STREAM CALLBACK";
-		PaStreamCallbackResult result = paContinue;
+		PaStreamCallbackResult result{paContinue};
 		try {
 			auto& preparedState = *static_cast<PreparedState*>(userData);
 			if (!preparedState.runningState.has_value()) {
@@ -1006,7 +1006,7 @@ namespace flexasio {
 	}
 
 	StreamStatusDescription FlexASIO::PreparedState::MakeStreamStatusDescription() const {
-		StreamStatusDescription description;
+		StreamStatusDescription description{};
 		description.backend = WidenDeviceName(GetHostApiTypeIdString(flexASIO.hostApi.info.type).c_str());
 		description.backend += GetStreamExclusivity() == StreamExclusivity::EXCLUSIVE ? L" exclusive" : L" shared";
 		if (flexASIO.inputDevice.has_value()) description.inputDevice = WidenDeviceName(flexASIO.inputDevice->info.name);
@@ -1014,12 +1014,12 @@ namespace flexasio {
 		description.sampleRate = sampleRate;
 		description.inputChannels = static_cast<int>(buffers.inputChannelCount);
 		description.outputChannels = static_cast<int>(buffers.outputChannelCount);
-		description.inputBits = flexASIO.inputSampleType.has_value() ? static_cast<int>(flexASIO.inputSampleType->size * 8) : 0;
-		description.outputBits = flexASIO.outputSampleType.has_value() ? static_cast<int>(flexASIO.outputSampleType->size * 8) : 0;
+		description.inputBits = flexASIO.inputSampleType.has_value() ? static_cast<int>(flexASIO.inputSampleType->size * 8U) : 0;
+		description.outputBits = flexASIO.outputSampleType.has_value() ? static_cast<int>(flexASIO.outputSampleType->size * 8U) : 0;
 		description.bufferFrames = static_cast<long>(buffers.bufferSizeInFrames);
-		const auto bytesPerSecond = description.sampleRate * (
+		const auto bytesPerSecond{description.sampleRate * (
 			description.inputChannels * (description.inputBits / 8.0) +
-			description.outputChannels * (description.outputBits / 8.0));
+			description.outputChannels * (description.outputBits / 8.0))};
 		description.bitrateBitsPerSecond = static_cast<std::int64_t>(std::llround(bytesPerSecond * 8.0));
 		return description;
 	}
@@ -1042,16 +1042,16 @@ namespace flexasio {
 	void FlexASIO::PreparedState::RunningState::NoteStreamStatus(const PaStreamCallbackFlags statusFlags) noexcept {
 		if (!streamStatus.has_value()) return;
 		streamStatus->NoteGlitches(
-			(statusFlags & paInputOverflow) != 0,
-			(statusFlags & paInputUnderflow) != 0,
-			(statusFlags & paOutputOverflow) != 0,
-			(statusFlags & paOutputUnderflow) != 0);
+			(statusFlags & paInputOverflow) != 0U,
+			(statusFlags & paInputUnderflow) != 0U,
+			(statusFlags & paOutputOverflow) != 0U,
+			(statusFlags & paOutputUnderflow) != 0U);
 		if (qpcFrequency <= 0) return;
 
-		LARGE_INTEGER now;
+		LARGE_INTEGER now{};
 		QueryPerformanceCounter(&now);
 		if (state == State::STEADYSTATE && haveSteadyCallbackQpc) {
-			const auto elapsedFrames = TicksToFrames(now.QuadPart - lastSteadyCallbackQpc);
+			const auto elapsedFrames{TicksToFrames(now.QuadPart - lastSteadyCallbackQpc)};
 			streamStatus->NoteSlackFrames(static_cast<std::int64_t>(preparedState.buffers.bufferSizeInFrames) - elapsedFrames);
 		}
 		if (state == State::STEADYSTATE) {
@@ -1064,7 +1064,7 @@ namespace flexasio {
 	{
 		NoteStreamStatus(statusFlags);
 
-		auto currentSamplePosition = samplePosition.load();
+		auto currentSamplePosition{samplePosition.load()};
 		currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
 		if (state == State::STEADYSTATE) currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + frameCount);
 		samplePosition.store(currentSamplePosition);
@@ -1091,17 +1091,17 @@ namespace flexasio {
 		if (statusFlags & paOutputUnderflow && IsLoggingEnabled())
 			Log() << "OUTPUT UNDERFLOW detected (gaps were inserted in the output)";
 
-		const auto inputSampleSizeInBytes = preparedState.buffers.inputSampleSizeInBytes;
-		const auto outputSampleSizeInBytes = preparedState.buffers.outputSampleSizeInBytes;
-		const std::byte* const* input_samples = static_cast<const std::byte* const*> (input);
-		std::byte* const* output_samples = static_cast<std::byte* const*>(output);
+		const auto inputSampleSizeInBytes{preparedState.buffers.inputSampleSizeInBytes};
+		const auto outputSampleSizeInBytes{preparedState.buffers.outputSampleSizeInBytes};
+		const std::byte* const* input_samples{static_cast<const std::byte* const*> (input)};
+		std::byte* const* output_samples{static_cast<std::byte* const*>(output)};
 
 		if (output_samples) {
-			for (int output_channel_index = 0; output_channel_index < preparedState.flexASIO.GetOutputChannelCount(); ++output_channel_index)
+			for (int output_channel_index{0}; output_channel_index < preparedState.flexASIO.GetOutputChannelCount(); ++output_channel_index)
 				memset(output_samples[output_channel_index], 0, frameCount * outputSampleSizeInBytes);
 		}
 
-		const auto outputReady = outputReadyState.has_value() ? &*outputReadyState : nullptr;
+		const auto outputReady{outputReadyState.has_value() ? &*outputReadyState : nullptr};
 
 		// See dechamps_ASIOUtil/BUFFERS.md for the gory details of how ASIO buffer management works.
 
@@ -1111,7 +1111,7 @@ namespace flexasio {
 
 			if (outputReady != nullptr) {
 				// Reset OutputReady, but only if we are not STOPPING, atomically.
-				auto outputReadyState = OutputReadyState::READY;
+				auto outputReadyState{OutputReadyState::READY};
 				outputReady->compare_exchange_strong(outputReadyState, OutputReadyState::NOT_READY);
 			}
 			if (!host_supports_timeinfo)
@@ -1128,7 +1128,7 @@ namespace flexasio {
 				time.timeInfo.systemTime = currentSamplePosition.timestamp;
 				time.timeInfo.sampleRate = preparedState.sampleRate;
 				if (IsLoggingEnabled()) Log() << "Firing ASIO bufferSwitchTimeInfo() callback with buffer index: " << driverBufferIndex << ", time info: (" << ::dechamps_ASIOUtil::DescribeASIOTime(time) << ")";
-				const auto timeResult = preparedState.callbacks.bufferSwitchTimeInfo(&time, driverBufferIndex, ASIOTrue);
+				const auto timeResult{preparedState.callbacks.bufferSwitchTimeInfo(&time, driverBufferIndex, ASIOTrue)};
 				if (IsLoggingEnabled()) Log() << "bufferSwitchTimeInfo() complete, returned time info: " << (timeResult == nullptr ? "none" : ::dechamps_ASIOUtil::DescribeASIOTime(*timeResult));
 			}
 		}
@@ -1139,12 +1139,12 @@ namespace flexasio {
 		else if (*outputReady == OutputReadyState::NOT_READY) {
 			if (IsLoggingEnabled()) Log() << "Waiting for the ASIO Host Application to signal OutputReady or stop";
 			LARGE_INTEGER waitStart{};
-			const bool timeWait = streamStatus.has_value() && qpcFrequency > 0 && QueryPerformanceCounter(&waitStart);
+			const bool timeWait{streamStatus.has_value() && qpcFrequency > 0 && QueryPerformanceCounter(&waitStart)};
 			outputReady->wait(OutputReadyState::NOT_READY);
 			if (timeWait && state == State::STEADYSTATE) {
-				LARGE_INTEGER waitEnd;
+				LARGE_INTEGER waitEnd{};
 				QueryPerformanceCounter(&waitEnd);
-				const auto waitFrames = TicksToFrames(waitEnd.QuadPart - waitStart.QuadPart);
+				const auto waitFrames{TicksToFrames(waitEnd.QuadPart - waitStart.QuadPart)};
 				if (waitFrames > 0) streamStatus->NoteSlackFrames(-waitFrames);
 			}
 		}
@@ -1171,7 +1171,7 @@ namespace flexasio {
 
 	void FlexASIO::PreparedState::RunningState::GetSamplePosition(ASIOSamples* sPos, ASIOTimeStamp* tStamp) const
 	{
-		const auto currentSamplePosition = samplePosition.load();
+		const auto currentSamplePosition{samplePosition.load()};
 		*sPos = currentSamplePosition.samples;
 		*tStamp = currentSamplePosition.timestamp;
 		if (IsLoggingEnabled()) Log() << "Returning: sample position " << ::dechamps_ASIOUtil::ASIOToInt64(*sPos) << ", timestamp " << ::dechamps_ASIOUtil::ASIOToInt64(*tStamp);
@@ -1196,7 +1196,7 @@ namespace flexasio {
 		}
 
 		auto& outputReady = *outputReadyState;
-		auto outputReadyState = OutputReadyState::NOT_READY;
+		auto outputReadyState{OutputReadyState::NOT_READY};
 		if (outputReady.compare_exchange_strong(outputReadyState, OutputReadyState::READY)) {
 			if (IsLoggingEnabled()) Log() << "Successfully set OutputReady";
 			outputReady.notify_all();

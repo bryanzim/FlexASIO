@@ -43,10 +43,10 @@ namespace flexasio {
 	}
 
 	void PortAudioDebugRedirector::Singleton::Start(Write write) {
-		const std::lock_guard lock(mutex);
+		const std::lock_guard lock{mutex};
 		Check();
 
-		if (referenceCount > 0) {
+		if (referenceCount > 0U) {
 			if (write != this->write) abort();
 		} else {
 			this->write = write;
@@ -59,12 +59,12 @@ namespace flexasio {
 	}
 
 	void PortAudioDebugRedirector::Singleton::Stop() {
-		const std::lock_guard lock(mutex);
+		const std::lock_guard lock{mutex};
 		Check();
 		if (!write) abort();
 
 		--referenceCount;
-		if (referenceCount > 0) return;
+		if (referenceCount > 0U) return;
 
 		this->write("Disabling PortAudio debug output redirection");
 		PaUtil_SetDebugPrintFunction(NULL);
@@ -76,13 +76,13 @@ namespace flexasio {
 		const auto write = singleton.write;
 		if (!write) abort();
 
-		std::string_view line(str);
-		while (!line.empty() && isspace(static_cast<unsigned char>(line.back()))) line.remove_suffix(1);
+		std::string_view line{str};
+		while (!line.empty() && isspace(static_cast<unsigned char>(line.back()))) line.remove_suffix(1U);
 		write(line);
 	}
 
 	void PortAudioDebugRedirector::Singleton::Check() const {
-		if ((referenceCount != 0) != !!write) abort();
+		if ((referenceCount != 0U) != !!write) abort();
 	}
 
 	PortAudioDebugRedirector::Singleton PortAudioDebugRedirector::singleton;
@@ -275,9 +275,9 @@ namespace flexasio {
 			{ KSDATAFORMAT_SUBTYPE_MULAW, "Mu-law" },
 			{ KSDATAFORMAT_SUBTYPE_PCM, "PCM" },
 			}, [](const GUID& guid) {
-			char str[128];
+			char str[128U];
 			// Shamelessly stolen from https://stackoverflow.com/a/18555932/172594
-			snprintf(str, sizeof(str), "{%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}", guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
+			snprintf(str, sizeof(str), "{%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}", guid.Data1, guid.Data2, guid.Data3, guid.Data4[0U], guid.Data4[1U], guid.Data4[2U], guid.Data4[3U], guid.Data4[4U], guid.Data4[5U], guid.Data4[6U], guid.Data4[7U]);
 			return std::string(str);
 		});
 	}

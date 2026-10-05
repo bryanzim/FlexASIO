@@ -23,7 +23,7 @@ namespace flexasio {
 		}
 
 		void SetUTF8Mode(FILE* file, std::wstring_view label) {
-			const auto fileno = _fileno(file);
+			const auto fileno{_fileno(file)};
 			if (fileno < 0) {
 				std::wcerr << "Warning: cannot get file descriptor for " << label;
 				return;
@@ -37,11 +37,11 @@ namespace flexasio {
 		}
 
 		std::wstring UTF8ToWideString(std::string_view utf8) {
-			const auto size = MultiByteToWideChar(CP_UTF8, 0, utf8.data(), int(utf8.size()), NULL, 0);
+			const auto size{MultiByteToWideChar(CP_UTF8, 0U, utf8.data(), int(utf8.size()), NULL, 0)};
 			if (size == 0)
 				throw std::runtime_error("Unable to convert UTF-8 string");
 			std::wstring result(size, 0);
-			if (MultiByteToWideChar(CP_UTF8, 0, utf8.data(), int(utf8.size()), result.data(), int(result.size())) == 0)
+			if (MultiByteToWideChar(CP_UTF8, 0U, utf8.data(), int(utf8.size()), result.data(), int(result.size())) == 0)
 				throw std::runtime_error("Unable to convert UTF-8 string");
 			return result;
 		}
@@ -49,7 +49,7 @@ namespace flexasio {
 		void PrintDevice(PaDeviceIndex deviceIndex) {
 			std::wcout << "Device index: " << deviceIndex << std::endl;
 
-			const auto device = Pa_GetDeviceInfo(deviceIndex);
+			const auto device{Pa_GetDeviceInfo(deviceIndex)};
 			if (device == nullptr) throw std::runtime_error("Pa_GetDeviceInfo() returned NULL");
 
 			std::wcout << "Device name: \"" << UTF8ToWideString(device->name) << "\"" << std::endl;
@@ -58,7 +58,7 @@ namespace flexasio {
 			std::wcout << "Output: max channel count " << device->maxOutputChannels << ", default latency " << device->defaultLowOutputLatency << "s (low) " << device->defaultHighOutputLatency << "s (high)" << std::endl;
 
 			if (device->hostApi < 0) throw std::runtime_error("invalid hostApi index");
-			const auto hostApi = Pa_GetHostApiInfo(device->hostApi);
+			const auto hostApi{Pa_GetHostApiInfo(device->hostApi)};
 			if (hostApi == nullptr) throw std::runtime_error("Pa_GetHostApiInfo() returned NULL");
 
 			std::wcout << "Host API name: " << hostApi->name << std::endl;
@@ -81,9 +81,9 @@ namespace flexasio {
 		}
 
 		void ListDevices() {
-			const PaDeviceIndex deviceCount = Pa_GetDeviceCount();
+			const PaDeviceIndex deviceCount{Pa_GetDeviceCount()};
 
-			for (PaDeviceIndex deviceIndex = 0; deviceIndex < deviceCount; ++deviceIndex) {
+			for (PaDeviceIndex deviceIndex{0}; deviceIndex < deviceCount; ++deviceIndex) {
 				try {
 					PrintDevice(deviceIndex);
 				}
@@ -98,7 +98,7 @@ namespace flexasio {
 			SetUTF8Mode(stderr, L"standard error");
 			SetUTF8Mode(stdout, L"standard output");
 
-			PortAudioDebugRedirector portAudioLogger([](std::string_view str) { std::wcerr << "[PortAudio] " << UTF8ToWideString(str) << std::endl; });
+			PortAudioDebugRedirector portAudioLogger{[](std::string_view str) { std::wcerr << "[PortAudio] " << UTF8ToWideString(str) << std::endl; }};
 
 			try {
 				ThrowOnPaError(Pa_Initialize());
