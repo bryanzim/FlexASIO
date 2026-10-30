@@ -1,0 +1,8 @@
+---
+description: Do not add a Cursor co-author trailer to git commits
+alwaysApply: true
+---
+
+# Git commits
+
+Do not add `Co-authored-by: Cursor` or any other Cursor co-author trailer to commit messages. Do not pass `--trailer` for a Cursor co-author. The commit author is the user only.

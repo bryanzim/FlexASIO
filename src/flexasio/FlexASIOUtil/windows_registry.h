@@ -4,11 +4,13 @@
 
 #include <memory>
 
-namespace flexasio {
+namespace flexasio
+{
 
-	struct HKEYDeleter final {
-		void operator()(HKEY hkey) const;
-	};
-	using UniqueHKEY = std::unique_ptr<std::remove_pointer_t<HKEY>, HKEYDeleter>;
+    struct HKEYDeleter final
+    {
+        void operator()(HKEY hkey) const;
+    };
+    using UniqueHKEY = std::unique_ptr<std::remove_pointer_t<HKEY>, HKEYDeleter>;
 
 }

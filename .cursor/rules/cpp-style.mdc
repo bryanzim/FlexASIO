@@ -1,0 +1,83 @@
+---
+description: C++ style for first-party sources
+globs: "**/*.{h,hpp,ipp,cpp}"
+alwaysApply: false
+---
+
+# C++ style
+
+Apply these rules to new and edited first-party C++ and to the vendored Excel SDK callback sources. Do not restyle third-party code under `out` or external trees. Leave the Excel C API structs, flexible arrays, and calling conventions in the XLCALL headers unchanged.
+
+- Brace-initialize objects: `Vector{ x, y }`, `std::size_t count{ 0U }`. Keep parentheses when braces change meaning, such as `std::vector<T>(count)` or a constructor that would be narrowed by braces.
+- Suffix unsigned indices, sizes, and unsigned constants by value: `U` through 4294967295, `ULL` above that. Do not suffix signed, floating, or character literals.
+- Mark default constructors and constructors callable with zero or one argument `explicit`. Leave copy and move constructors implicit. Do not add a constructor to an aggregate.
+- Mark a function `constexpr` when its body is a constant expression.
+- Mark parameters and locals `const` when they are not modified.
+- Mark a function `[[nodiscard]]` when ignoring its result is a mistake. Skip `void` functions.
+- Mark a function `noexcept` only when it cannot throw, including through functions it calls. Do not mark functions that allocate, lock, stream, or throw.
+- Put `if`, `for`, `while`, `do`, and `else` bodies in `{}` blocks.
+- Prefer the C++ library over the C library: `std::memcpy`, `std::memset`, `std::sin`, `std::abs`. Call an OS or C function with `::` only when C++ has no equivalent, as in `::gmtime_s`.
+- Prefer `std::array` to a C-style array. Pass `.data()` when a C interface needs a pointer.
+- Name fixed-width integers and `size_t` in `std`: `std::uint32_t`, `std::int64_t`, `std::size_t`.
+- Mark an unused parameter or local `[[maybe_unused]]` and keep its name. Do not silence it with a `(void)` cast or by omitting the name.
+- Cast with `static_cast`, `const_cast`, `reinterpret_cast`, or `dynamic_cast`. Do not use a C-style cast.
+- Prefer preincrement and predecrement: `++index`, `--index`. Keep the postfix form when the previous value is the result, as in `path[depth++] = slot`, `return id++`, or `operator++(int)`.
+- Prefer `using` to `typedef`. Leave a `typedef` that is part of a C API.
+- Prefer `nullptr` to `NULL`.
+- Parenthesize each operand of `&&` and `||` when that operand is a comparison or another compound expression: `(index > 0U) && (index < count)`.
+- Group includes, with one blank line between groups, and sort each group lexicographically. An implementation file starts with its associated header. Then other project headers, then external non-OS headers, then OS headers, then C and C++ standard headers. Project headers use quotes. Every other header uses angle brackets. Keep every OS header in one guard chain: `#ifdef` for the first operating system and `#elif defined(...)` for each other operating system that has headers. Inside the Windows branch, include `<winsock2.h>` before `<Windows.h>`.
+
+```cpp
+#include "Widget.h"
+
+#include "Other.h"
+#include "Utility.h"
+
+#include <asio.hpp>
+#include <gtest/gtest.h>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <Windows.h>
+#elif defined(__linux__)
+#include <sys/socket.h>
+#elif defined(__APPLE__)
+#include <sys/socket.h>
+#endif
+
+#include <algorithm>
+#include <cstdint>
+#include <vector>
+```
+
+```cpp
+explicit constexpr TimePoint() noexcept = default;
+
+[[nodiscard]] constexpr std::size_t size() const noexcept
+{
+    return m_Size;
+}
+
+if (index == 0U)
+{
+    std::memcpy(destination, source, count);
+}
+
+void consume([[maybe_unused]] const int value) noexcept
+{
+}
+
+const std::size_t count{ static_cast<std::size_t>(index) };
+const std::array<int, 4U> values{ 1, 2, 3, 4 };
+
+for (std::size_t index{ 0U }; index < count; ++index)
+{
+    ++total;
+}
+path[depth++] = slot;
+const Node* node{ nullptr };
+if ((index > 0U) && (index < count))
+{
+    publish((year == reformYear) && (month == reformMonth));
+}
+```
