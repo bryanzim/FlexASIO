@@ -3,7 +3,9 @@
 
 // This implements DLL entry points so that the automagic ATL module can do its thing. Nothing to see here, move along.
 
-class COMDLL : public CAtlDllModuleT<COMDLL> { };
+class COMDLL : public CAtlDllModuleT<COMDLL>
+{
+};
 static COMDLL comdll{};
 
 extern "C" BOOL WINAPI DllMain(HINSTANCE, DWORD dwReason, LPVOID lpReserved) { return comdll.DllMain(dwReason, lpReserved); }

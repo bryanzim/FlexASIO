@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 
-namespace flexasio {
-	std::wstring GetUserDirectory();
+namespace flexasio
+{
+    std::wstring GetUserDirectory();
 }

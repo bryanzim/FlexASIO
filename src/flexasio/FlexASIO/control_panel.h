@@ -2,8 +2,9 @@
 
 #include <windows.h>
 
-namespace flexasio {
+namespace flexasio
+{
 
-	void OpenControlPanel(HWND windowHandle);
+    void OpenControlPanel(HWND windowHandle);
 
 }
