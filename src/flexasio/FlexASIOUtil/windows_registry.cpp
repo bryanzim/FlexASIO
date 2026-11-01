@@ -10,7 +10,9 @@ namespace flexasio
     {
         const auto regCloseKeyError{ ::RegCloseKey(hkey) };
         if (regCloseKeyError != ERROR_SUCCESS)
+        {
             throw std::system_error(regCloseKeyError, std::system_category(), "Unable to close registry key");
+        }
     }
 
 }

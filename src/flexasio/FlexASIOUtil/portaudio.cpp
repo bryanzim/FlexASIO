@@ -7,7 +7,10 @@
 #include <ksmedia.h>
 #include <mmreg.h>
 
+#include <array>
 #include <cctype>
+#include <cstdio>
+#include <cstdlib>
 #include <stdexcept>
 #include <string_view>
 
@@ -41,7 +44,9 @@ namespace flexasio
     {
         Check();
         if (write)
-            abort();
+        {
+            std::abort();
+        }
     }
 
     void PortAudioDebugRedirector::Singleton::Start(Write write)
@@ -52,7 +57,9 @@ namespace flexasio
         if (referenceCount > 0U)
         {
             if (write != this->write)
-                abort();
+            {
+                std::abort();
+            }
         }
         else
         {
@@ -70,14 +77,18 @@ namespace flexasio
         const std::lock_guard lock{ mutex };
         Check();
         if (!write)
-            abort();
+        {
+            std::abort();
+        }
 
         --referenceCount;
         if (referenceCount > 0U)
+        {
             return;
+        }
 
         this->write("Disabling PortAudio debug output redirection");
-        PaUtil_SetDebugPrintFunction(NULL);
+        PaUtil_SetDebugPrintFunction(nullptr);
         write = nullptr;
     }
 
@@ -86,18 +97,24 @@ namespace flexasio
         singleton.Check();
         const auto write = singleton.write;
         if (!write)
-            abort();
+        {
+            std::abort();
+        }
 
         std::string_view line{ str };
-        while (!line.empty() && isspace(static_cast<unsigned char>(line.back())))
+        while ((!line.empty()) && std::isspace(static_cast<unsigned char>(line.back())))
+        {
             line.remove_suffix(1U);
+        }
         write(line);
     }
 
     void PortAudioDebugRedirector::Singleton::Check() const
     {
         if ((referenceCount != 0U) != !!write)
-            abort();
+        {
+            std::abort();
+        }
     }
 
     PortAudioDebugRedirector::Singleton PortAudioDebugRedirector::singleton;
@@ -223,7 +240,9 @@ namespace flexasio
     {
         const auto info = Pa_GetHostApiInfo(index);
         if (info == nullptr)
+        {
             throw std::runtime_error(std::string("Unable to get host API info for host API index ") + std::to_string(index));
+        }
         return *info;
     }
 
@@ -244,7 +263,9 @@ namespace flexasio
     {
         const auto info = Pa_GetDeviceInfo(index);
         if (info == nullptr)
+        {
             throw std::runtime_error(std::string("Unable to get device info for device index ") + std::to_string(index));
+        }
         return *info;
     }
 
@@ -253,7 +274,9 @@ namespace flexasio
         WAVEFORMATEXTENSIBLE format{};
         const auto result = PaWasapi_GetDeviceDefaultFormat(&format, sizeof(format), index);
         if (result <= 0)
+        {
             throw std::runtime_error(std::string("Unable to get WASAPI device default format for device ") + std::to_string(index) + ": " + Pa_GetErrorText(result));
+        }
         return format;
     }
     WAVEFORMATEXTENSIBLE GetWasapiDeviceMixFormat(PaDeviceIndex index)
@@ -261,16 +284,18 @@ namespace flexasio
         WAVEFORMATEXTENSIBLE format{};
         const auto result = PaWasapi_GetDeviceMixFormat(&format, sizeof(format), index);
         if (result <= 0)
+        {
             throw std::runtime_error(std::string("Unable to get WASAPI device mix format for device ") + std::to_string(index) + ": " + Pa_GetErrorText(result));
+        }
         return format;
     }
 
     std::string GetWaveFormatTagString(WORD formatTag)
     {
-        return ::dechamps_cpputil::EnumToString(int(formatTag), {
-                                                                    { WAVE_FORMAT_EXTENSIBLE, "EXTENSIBLE" },
-                                                                    {       WAVE_FORMAT_MPEG,       "MPEG" },
-                                                                    { WAVE_FORMAT_MPEGLAYER3, "MPEGLAYER3" },
+        return ::dechamps_cpputil::EnumToString(static_cast<int>(formatTag), {
+                                                                                 { WAVE_FORMAT_EXTENSIBLE, "EXTENSIBLE" },
+                                                                                 {       WAVE_FORMAT_MPEG,       "MPEG" },
+                                                                                 { WAVE_FORMAT_MPEGLAYER3, "MPEGLAYER3" },
         });
     }
 
@@ -312,10 +337,10 @@ namespace flexasio
                                                                {                         KSDATAFORMAT_SUBTYPE_PCM,                         "PCM" },
         },
                                                 [](const GUID& guid) {
-                                                    char str[128U];
+                                                    std::array<char, 128U> str{};
                                                     // Shamelessly stolen from https://stackoverflow.com/a/18555932/172594
-                                                    snprintf(str, sizeof(str), "{%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}", guid.Data1, guid.Data2, guid.Data3, guid.Data4[0U], guid.Data4[1U], guid.Data4[2U], guid.Data4[3U], guid.Data4[4U], guid.Data4[5U], guid.Data4[6U], guid.Data4[7U]);
-                                                    return std::string(str);
+                                                    std::snprintf(str.data(), str.size(), "{%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}", guid.Data1, guid.Data2, guid.Data3, guid.Data4[0U], guid.Data4[1U], guid.Data4[2U], guid.Data4[3U], guid.Data4[4U], guid.Data4[5U], guid.Data4[6U], guid.Data4[7U]);
+                                                    return std::string(str.data());
                                                 });
     }
 

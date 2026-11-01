@@ -4,7 +4,9 @@
 
 #include <shellapi.h>
 
+#include <array>
 #include <cmath>
+#include <cstdint>
 #include <sstream>
 #include <system_error>
 
@@ -17,7 +19,7 @@ namespace flexasio
         constexpr UINT WM_TRAY{ WM_APP + 2U };
         constexpr UINT_PTR kRefreshTimerId{ 1U };
         constexpr UINT kRefreshMilliseconds{ 250U };
-        constexpr wchar_t kWindowClassName[] = L"FlexASIOStreamStatus";
+        constexpr auto kWindowClassName{ std::to_array(L"FlexASIOStreamStatus") };
         // The resource-id macros are ANSI when UNICODE is unset, so spell the wide forms explicitly.
         const LPCWSTR kInformationIcon = MAKEINTRESOURCEW(32516);
         const LPCWSTR kArrowCursor = MAKEINTRESOURCEW(32512);
@@ -54,12 +56,18 @@ namespace flexasio
 
         std::wstring FormatDevice(const StreamStatusDescription& description)
         {
-            if (!description.inputDevice.empty() && !description.outputDevice.empty() && description.inputDevice != description.outputDevice)
+            if ((!description.inputDevice.empty()) && (!description.outputDevice.empty()) && (description.inputDevice != description.outputDevice))
+            {
                 return L"in " + description.inputDevice + L" / out " + description.outputDevice;
+            }
             if (!description.outputDevice.empty())
+            {
                 return description.outputDevice;
+            }
             if (!description.inputDevice.empty())
+            {
                 return description.inputDevice;
+            }
             return L"(no device)";
         }
 
@@ -71,10 +79,14 @@ namespace flexasio
                               std::to_wstring(description.inputChannels) + L"in/" + std::to_wstring(description.outputChannels) + L"out" };
             const auto device{ FormatDevice(description) };
             if (!device.empty())
+            {
                 tip += L" " + device;
+            }
             tip += L" xrun " + std::to_wstring(glitches);
             if (tip.size() > 127U)
+            {
                 tip.resize(127U);
+            }
             return tip;
         }
 
@@ -87,9 +99,13 @@ namespace flexasio
                  << FormatDirection(L"Device out", description.outputDevice, description.outputChannels, description.outputBits, description.sampleRate, description.bufferFrames, snapshot.outputOverflow, snapshot.outputUnderflow)
                  << L"\n";
             if (!snapshot.hasSlack)
+            {
                 text << L"Early/late min/avg/max: n/a\n";
+            }
             else
+            {
                 text << L"Early/late min/avg/max: " << snapshot.minSlackFrames << L" / " << snapshot.averageSlackFrames << L" / " << snapshot.maxSlackFrames << L" frames";
+            }
             return text.str();
         }
 
@@ -105,7 +121,9 @@ namespace flexasio
             RECT bounds{ 0, 0, contentWidth, 0 };
             DrawTextW(dc, text.c_str(), static_cast<int>(text.size()), &bounds, kPopupDrawFlags | DT_CALCRECT);
             if (previousFont != nullptr)
+            {
                 SelectObject(dc, previousFont);
+            }
             ReleaseDC(nullptr, dc);
             return bounds.bottom - bounds.top;
         }
@@ -129,10 +147,12 @@ namespace flexasio
             const HDC screen{ GetDC(nullptr) };
             const HBITMAP color{ CreateDIBSection(screen, reinterpret_cast<BITMAPINFO*>(&header), DIB_RGB_COLORS, &bits, nullptr, 0U) };
             ReleaseDC(nullptr, screen);
-            if (color == nullptr || bits == nullptr)
+            if ((color == nullptr) || (bits == nullptr))
             {
                 if (color != nullptr)
+                {
                     DeleteObject(color);
+                }
                 return LoadIconW(nullptr, kInformationIcon);
             }
 
@@ -146,8 +166,10 @@ namespace flexasio
                     const bool inside{ dx * dx + dy * dy <= 14 * 14 };
                     std::uint32_t pixel{ inside ? 0xFF1F6B3AU : 0x00000000U };
                     const unsigned int bar{ (x / 4U) % 2U == 0U ? 6U : 10U };
-                    if (inside && y > size / 2U - bar && y < size / 2U + bar && x > 6U && x < size - 6U)
+                    if (inside && (y > size / 2U - bar) && (y < size / 2U + bar) && (x > 6U) && (x < size - 6U))
+                    {
                         pixel = 0xFFE7F6ECU;
+                    }
                     pixels[y * size + x] = pixel;
                 }
             }
@@ -160,9 +182,13 @@ namespace flexasio
             const HICON created{ CreateIconIndirect(&iconInfo) };
             DeleteObject(color);
             if (mask != nullptr)
+            {
                 DeleteObject(mask);
+            }
             if (created != nullptr)
+            {
                 return created;
+            }
             return LoadIconW(nullptr, kInformationIcon);
         }
 
@@ -173,9 +199,11 @@ namespace flexasio
             windowClass.lpfnWndProc = windowProc;
             windowClass.hCursor = LoadCursorW(nullptr, kArrowCursor);
             windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
-            windowClass.lpszClassName = kWindowClassName;
-            if (RegisterClassExW(&windowClass) == 0U && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
+            windowClass.lpszClassName = kWindowClassName.data();
+            if ((RegisterClassExW(&windowClass) == 0U) && (GetLastError() != ERROR_CLASS_ALREADY_EXISTS))
+            {
                 throw std::system_error(GetLastError(), std::system_category(), "Unable to register stream status window class");
+            }
         }
 
     }
@@ -183,25 +211,33 @@ namespace flexasio
     void StreamStatus::NoteGlitches(const bool inputOverflow, const bool inputUnderflow, const bool outputOverflow, const bool outputUnderflow) noexcept
     {
         if (inputOverflow)
+        {
             inputOverflowCount.fetch_add(1U, std::memory_order_relaxed);
+        }
         if (inputUnderflow)
+        {
             inputUnderflowCount.fetch_add(1U, std::memory_order_relaxed);
+        }
         if (outputOverflow)
+        {
             outputOverflowCount.fetch_add(1U, std::memory_order_relaxed);
+        }
         if (outputUnderflow)
+        {
             outputUnderflowCount.fetch_add(1U, std::memory_order_relaxed);
+        }
     }
 
     void StreamStatus::NoteSlackFrames(const std::int64_t slackFrames) noexcept
     {
         auto currentMin{ minSlackFrames.load(std::memory_order_relaxed) };
-        while (slackFrames < currentMin &&
-               !minSlackFrames.compare_exchange_weak(currentMin, slackFrames, std::memory_order_relaxed))
+        while ((slackFrames < currentMin) &&
+               (!minSlackFrames.compare_exchange_weak(currentMin, slackFrames, std::memory_order_relaxed)))
         {
         }
         auto currentMax{ maxSlackFrames.load(std::memory_order_relaxed) };
-        while (slackFrames > currentMax &&
-               !maxSlackFrames.compare_exchange_weak(currentMax, slackFrames, std::memory_order_relaxed))
+        while ((slackFrames > currentMax) &&
+               (!maxSlackFrames.compare_exchange_weak(currentMax, slackFrames, std::memory_order_relaxed)))
         {
         }
         slackSumFrames.fetch_add(slackFrames, std::memory_order_relaxed);
@@ -230,7 +266,7 @@ namespace flexasio
         snapshot.minSlackFrames = minSlackFrames.load(std::memory_order_relaxed);
         snapshot.maxSlackFrames = maxSlackFrames.load(std::memory_order_relaxed);
         const auto sampleCount{ slackSampleCount.load(std::memory_order_relaxed) };
-        snapshot.hasSlack = sampleCount > 0U && snapshot.minSlackFrames != INT64_MAX;
+        snapshot.hasSlack = (sampleCount > 0U) && (snapshot.minSlackFrames != INT64_MAX);
         if (snapshot.hasSlack)
         {
             const auto sum{ slackSumFrames.load(std::memory_order_relaxed) };
@@ -245,13 +281,17 @@ namespace flexasio
     {
         started = CreateEventW(nullptr, TRUE, FALSE, nullptr);
         if (started == nullptr)
+        {
             throw std::system_error(GetLastError(), std::system_category(), "Unable to create stream status event");
+        }
         thread = std::thread([this] { ThreadMain(); });
         WaitForSingleObject(started, INFINITE);
         if (messageWindow.load() == nullptr)
         {
             if (thread.joinable())
+            {
                 thread.join();
+            }
             CloseHandle(started);
             started = nullptr;
             throw std::runtime_error("Unable to create stream status window");
@@ -261,11 +301,17 @@ namespace flexasio
     StreamStatusIcon::~StreamStatusIcon()
     {
         if (const auto window{ messageWindow.load() })
+        {
             PostMessageW(window, WM_APP_STOP, 0U, 0);
+        }
         if (thread.joinable())
+        {
             thread.join();
+        }
         if (started != nullptr)
+        {
             CloseHandle(started);
+        }
     }
 
     void StreamStatusIcon::ThreadMain() noexcept
@@ -273,7 +319,7 @@ namespace flexasio
         try
         {
             RegisterMessageWindowClass(&StreamStatusIcon::WindowProc);
-            const HWND window{ CreateWindowExW(0U, kWindowClassName, L"FlexASIO stream status", 0U, 0, 0, 0, 0, HWND_MESSAGE, nullptr, nullptr, this) };
+            const HWND window{ CreateWindowExW(0U, kWindowClassName.data(), L"FlexASIO stream status", 0U, 0, 0, 0, 0, HWND_MESSAGE, nullptr, nullptr, this) };
             messageWindow.store(window);
             if (window != nullptr)
             {
@@ -291,14 +337,18 @@ namespace flexasio
         }
         SetEvent(started);
         if (messageWindow.load() == nullptr)
+        {
             return;
+        }
 
         MSG message{};
         for (;;)
         {
             const auto result{ GetMessageW(&message, nullptr, 0U, 0U) };
             if (result <= 0)
+            {
                 break;
+            }
             TranslateMessage(&message);
             DispatchMessageW(&message);
         }
@@ -308,14 +358,16 @@ namespace flexasio
         DestroyWindow(messageWindow.load());
         messageWindow.store(nullptr);
         if (font != nullptr)
+        {
             DeleteObject(font);
+        }
         font = nullptr;
     }
 
     void StreamStatusIcon::AddIcon()
     {
         icon = CreateStatusIcon();
-        iconIsOwned = icon != nullptr && icon != LoadIconW(nullptr, kInformationIcon);
+        iconIsOwned = (icon != nullptr) && (icon != LoadIconW(nullptr, kInformationIcon));
         notifyIcon = {};
         notifyIcon.cbSize = sizeof(notifyIcon);
         notifyIcon.hWnd = messageWindow.load();
@@ -327,8 +379,10 @@ namespace flexasio
         wcsncpy_s(notifyIcon.szTip, tip.c_str(), _TRUNCATE);
         if (!Shell_NotifyIconW(NIM_ADD, &notifyIcon))
         {
-            if (iconIsOwned && icon != nullptr)
+            if (iconIsOwned && (icon != nullptr))
+            {
                 DestroyIcon(icon);
+            }
             icon = nullptr;
             iconIsOwned = false;
             throw std::system_error(GetLastError(), std::system_category(), "Unable to add stream status icon");
@@ -341,11 +395,15 @@ namespace flexasio
     void StreamStatusIcon::RemoveIcon() noexcept
     {
         if (!iconAdded)
+        {
             return;
+        }
         Shell_NotifyIconW(NIM_DELETE, &notifyIcon);
         iconAdded = false;
-        if (iconIsOwned && icon != nullptr)
+        if (iconIsOwned && (icon != nullptr))
+        {
             DestroyIcon(icon);
+        }
         icon = nullptr;
         iconIsOwned = false;
     }
@@ -353,7 +411,9 @@ namespace flexasio
     void StreamStatusIcon::UpdateTip()
     {
         if (!iconAdded)
+        {
             return;
+        }
         const auto tip{ FormatTooltip(status.Description(), status.LoadSnapshot()) };
         notifyIcon.uFlags = NIF_TIP | NIF_SHOWTIP;
         wcsncpy_s(notifyIcon.szTip, tip.c_str(), _TRUNCATE);
@@ -390,15 +450,23 @@ namespace flexasio
         int x{ cursor.x };
         int y{ cursor.y - height - 8 };
         if (x + width > workArea.right)
+        {
             x = workArea.right - width;
+        }
         if (x < workArea.left)
+        {
             x = workArea.left;
+        }
         if (y < workArea.top)
+        {
             y = cursor.y + 8;
+        }
         if (y + height > workArea.bottom)
+        {
             y = workArea.bottom - height;
+        }
 
-        popup = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, kWindowClassName, L"FlexASIO",
+        popup = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, kWindowClassName.data(), L"FlexASIO",
                                 WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
                                 x, y, width, height, nullptr, nullptr, nullptr, this);
         if (popup != nullptr)
@@ -409,8 +477,10 @@ namespace flexasio
                                           WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                                           padding, client.bottom - padding - kResetButtonHeight, 160, kResetButtonHeight,
                                           popup, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kResetButtonId)), nullptr, nullptr);
-            if (resetButton != nullptr && font != nullptr)
+            if ((resetButton != nullptr) && (font != nullptr))
+            {
                 SendMessageW(resetButton, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+            }
             SetForegroundWindow(popup);
         }
     }
@@ -418,7 +488,9 @@ namespace flexasio
     void StreamStatusIcon::DestroyPopup() noexcept
     {
         if (popup == nullptr)
+        {
             return;
+        }
         const HWND window{ popup };
         popup = nullptr;
         resetButton = nullptr;
@@ -439,7 +511,9 @@ namespace flexasio
         const HGDIOBJ previousFont{ font != nullptr ? SelectObject(dc, font) : nullptr };
         DrawTextW(dc, popupText.c_str(), static_cast<int>(popupText.size()), &client, kPopupDrawFlags);
         if (previousFont != nullptr)
+        {
             SelectObject(dc, previousFont);
+        }
         EndPaint(popupWindow, &paint);
     }
 
@@ -449,17 +523,21 @@ namespace flexasio
         {
         case WM_NCCREATE:
             // CreateWindow can paint before it returns, so remember the popup before the first WM_PAINT.
-            if (messageWindow.load() != nullptr && window != messageWindow.load())
+            if ((messageWindow.load() != nullptr) && (window != messageWindow.load()))
+            {
                 popup = window;
+            }
             break;
         case WM_TRAY: {
             const auto event{ LOWORD(lParam) };
-            if (event == NIN_SELECT || event == NIN_KEYSELECT || event == WM_LBUTTONUP || event == WM_LBUTTONDBLCLK)
+            if ((event == NIN_SELECT) || (event == NIN_KEYSELECT) || (event == WM_LBUTTONUP) || (event == WM_LBUTTONDBLCLK))
+            {
                 ShowPopup();
+            }
             return 0;
         }
         case WM_COMMAND:
-            if (window == popup && LOWORD(wParam) == kResetButtonId && HIWORD(wParam) == BN_CLICKED)
+            if ((window == popup) && (LOWORD(wParam) == kResetButtonId) && (HIWORD(wParam) == BN_CLICKED))
             {
                 status.Reset();
                 popupText = FormatPopup(status.Description(), status.LoadSnapshot());
@@ -487,7 +565,9 @@ namespace flexasio
             break;
         case WM_DESTROY:
             if (window == popup)
+            {
                 popup = nullptr;
+            }
             return 0;
         case WM_PAINT:
             if (window == popup)
@@ -514,7 +594,9 @@ namespace flexasio
         }
         auto* self{ reinterpret_cast<StreamStatusIcon*>(GetWindowLongPtrW(window, GWLP_USERDATA)) };
         if (self == nullptr)
+        {
             return DefWindowProcW(window, message, wParam, lParam);
+        }
         try
         {
             return self->HandleMessage(window, message, wParam, lParam);

@@ -46,118 +46,126 @@ namespace flexasio
             DECLARE_REGISTRY_RESOURCEID(IDR_FLEXASIO)
 
         public:
-            CFlexASIO() throw()
+            explicit CFlexASIO() noexcept
             {
                 Enter("CFlexASIO()", [] {});
             }
-            ~CFlexASIO() throw()
+            ~CFlexASIO() noexcept
             {
                 Enter("~CFlexASIO()", [] {});
             }
 
             // IASIO implementation
 
-            ASIOBool init(void* sysHandle) throw() final
+            ASIOBool init(void* sysHandle) noexcept final
             {
                 return (Enter("init()", [&] {
                             if (flexASIO.has_value())
+                            {
                                 throw ASIOException(ASE_InvalidMode, "init() called more than once");
+                            }
                             flexASIO.emplace(sysHandle);
                         }) == ASE_OK)
                            ? ASIOTrue
                            : ASIOFalse;
             }
-            void getDriverName(char* name) throw() final
+            void getDriverName(char* name) noexcept final
             {
                 Enter("getDriverName()", [&] {
                     strcpy_s(name, 32U, "FlexASIO");
                 });
             }
-            long getDriverVersion() throw() final
+            long getDriverVersion() noexcept final
             {
                 Enter("getDriverVersion()", [] {});
                 return 0;
             }
-            void getErrorMessage(char* string) throw() final
+            void getErrorMessage(char* string) noexcept final
             {
                 Enter("getErrorMessage()", [&] {
                     std::string_view error(lastError);
                     constexpr auto maxSize{ 123U };
                     if (error.size() > maxSize)
+                    {
                         error.remove_suffix(error.size() - maxSize);
+                    }
                     std::copy(error.begin(), error.end(), string);
                     string[error.size()] = '\0';
                 });
             }
-            ASIOError getClockSources(ASIOClockSource* clocks, long* numSources) throw() final;
-            ASIOError setClockSource(long reference) throw() final;
-            ASIOError getBufferSize(long* minSize, long* maxSize, long* preferredSize, long* granularity) throw() final
+            ASIOError getClockSources(ASIOClockSource* clocks, long* numSources) noexcept final;
+            ASIOError setClockSource(long reference) noexcept final;
+            ASIOError getBufferSize(long* minSize, long* maxSize, long* preferredSize, long* granularity) noexcept final
             {
                 return EnterWithMethod("getBufferSize()", &FlexASIO::GetBufferSize, minSize, maxSize, preferredSize, granularity);
             }
 
-            ASIOError getChannels(long* numInputChannels, long* numOutputChannels) throw() final
+            ASIOError getChannels(long* numInputChannels, long* numOutputChannels) noexcept final
             {
                 return EnterWithMethod("getChannels()", &FlexASIO::GetChannels, numInputChannels, numOutputChannels);
             }
-            ASIOError getChannelInfo(ASIOChannelInfo* info) throw() final
+            ASIOError getChannelInfo(ASIOChannelInfo* info) noexcept final
             {
                 return EnterWithMethod("getChannelInfo()", &FlexASIO::GetChannelInfo, info);
             }
-            ASIOError canSampleRate(ASIOSampleRate sampleRate) throw() final
+            ASIOError canSampleRate(ASIOSampleRate sampleRate) noexcept final
             {
                 bool result{};
                 const auto error = EnterInitialized("canSampleRate()", [&] {
                     result = flexASIO->CanSampleRate(sampleRate);
                 });
                 if (error != ASE_OK)
+                {
                     return error;
+                }
                 return result ? ASE_OK : ASE_NoClock;
             }
-            ASIOError setSampleRate(ASIOSampleRate sampleRate) throw() final
+            ASIOError setSampleRate(ASIOSampleRate sampleRate) noexcept final
             {
                 return EnterWithMethod("setSampleRate()", &FlexASIO::SetSampleRate, sampleRate);
             }
-            ASIOError getSampleRate(ASIOSampleRate* sampleRate) throw() final
+            ASIOError getSampleRate(ASIOSampleRate* sampleRate) noexcept final
             {
                 return EnterWithMethod("getSampleRate()", &FlexASIO::GetSampleRate, sampleRate);
             }
 
-            ASIOError createBuffers(ASIOBufferInfo* bufferInfos, long numChannels, long bufferSize, ASIOCallbacks* callbacks) throw() final
+            ASIOError createBuffers(ASIOBufferInfo* bufferInfos, long numChannels, long bufferSize, ASIOCallbacks* callbacks) noexcept final
             {
                 return EnterWithMethod("createBuffers()", &FlexASIO::CreateBuffers, bufferInfos, numChannels, bufferSize, callbacks);
             }
-            ASIOError disposeBuffers() throw() final
+            ASIOError disposeBuffers() noexcept final
             {
                 return EnterWithMethod("disposeBuffers()", &FlexASIO::DisposeBuffers);
             }
-            ASIOError getLatencies(long* inputLatency, long* outputLatency) throw() final
+            ASIOError getLatencies(long* inputLatency, long* outputLatency) noexcept final
             {
                 return EnterWithMethod("getLatencies()", &FlexASIO::GetLatencies, inputLatency, outputLatency);
             }
 
-            ASIOError start() throw() final
+            ASIOError start() noexcept final
             {
                 return EnterWithMethod("start()", &FlexASIO::Start);
             }
-            ASIOError stop() throw() final
+            ASIOError stop() noexcept final
             {
                 return EnterWithMethod("stop()", &FlexASIO::Stop);
             }
-            ASIOError getSamplePosition(ASIOSamples* sPos, ASIOTimeStamp* tStamp) throw() final
+            ASIOError getSamplePosition(ASIOSamples* sPos, ASIOTimeStamp* tStamp) noexcept final
             {
                 return EnterWithMethod("getSamplePosition()", &FlexASIO::GetSamplePosition, sPos, tStamp);
             }
 
-            ASIOError controlPanel() throw() final
+            ASIOError controlPanel() noexcept final
             {
                 return Enter("controlPanel()", [&] {
                     if (!flexASIO.has_value())
-                        OpenControlPanel(NULL); // https://github.com/dechamps/FlexASIO/issues/184
+                    {
+                        OpenControlPanel(nullptr); // https://github.com/dechamps/FlexASIO/issues/184
+                    }
                     flexASIO->ControlPanel();
                 });
             }
-            ASIOError future(long selector, void*) throw() final
+            ASIOError future(long selector, [[maybe_unused]] void* params) noexcept final
             {
                 return Enter("future()", [&] {
                     Log() << "Requested future selector: " << ::dechamps_ASIOUtil::GetASIOFutureSelectorString(selector);
@@ -165,7 +173,7 @@ namespace flexasio
                 });
             }
 
-            ASIOError outputReady() throw() final
+            ASIOError outputReady() noexcept final
             {
                 return EnterWithMethod("outputReady()", &FlexASIO::OutputReady);
             }
@@ -186,7 +194,9 @@ namespace flexasio
         ASIOError CFlexASIO::Enter(std::string_view context, Functor functor)
         {
             if (IsLoggingEnabled())
+            {
                 Log() << "--- ENTERING CONTEXT: " << context << " on " << this;
+            }
             ASIOError result{};
             try
             {
@@ -211,12 +221,16 @@ namespace flexasio
             if (result == ASE_OK)
             {
                 if (IsLoggingEnabled())
+                {
                     Log() << "--- EXITING CONTEXT: " << context << " [OK]";
+                }
             }
             else
             {
                 if (IsLoggingEnabled())
+                {
                     Log() << "--- EXITING CONTEXT: " << context << " (" << ::dechamps_ASIOUtil::GetASIOErrorString(result) << " " << lastError << ")";
+                }
             }
             return result;
         }
@@ -239,11 +253,13 @@ namespace flexasio
             return EnterInitialized(context, [&] { return ((*flexASIO).*method)(std::forward<Args>(args)...); });
         }
 
-        ASIOError CFlexASIO::getClockSources(ASIOClockSource* clocks, long* numSources) throw()
+        ASIOError CFlexASIO::getClockSources(ASIOClockSource* clocks, long* numSources) noexcept
         {
             return Enter("getClockSources()", [&] {
-                if (!clocks || !numSources || *numSources < 1)
+                if ((!clocks) || (!numSources) || (*numSources < 1))
+                {
                     throw ASIOException(ASE_InvalidParameter, "invalid parameters to getClockSources()");
+                }
 
                 clocks->index = 0;
                 clocks->associatedChannel = -1;
@@ -254,12 +270,14 @@ namespace flexasio
             });
         }
 
-        ASIOError CFlexASIO::setClockSource(long reference) throw()
+        ASIOError CFlexASIO::setClockSource(long reference) noexcept
         {
             return Enter("setClockSource()", [&] {
                 Log() << "reference = " << reference;
                 if (reference != 0)
+                {
                     throw ASIOException(ASE_InvalidParameter, "setClockSource() parameter out of bounds");
+                }
             });
         }
 
@@ -275,15 +293,21 @@ IASIO* CreateFlexASIO()
 {
     ::CFlexASIO* flexASIO = nullptr;
     if (::flexasio::CFlexASIO::CreateInstance(&flexASIO) != S_OK)
-        abort();
+    {
+        std::abort();
+    }
     if (flexASIO == nullptr)
-        abort();
+    {
+        std::abort();
+    }
     return flexASIO;
 }
 
 void ReleaseFlexASIO(IASIO* const iASIO)
 {
     if (iASIO == nullptr)
-        abort();
+    {
+        std::abort();
+    }
     iASIO->Release();
 }

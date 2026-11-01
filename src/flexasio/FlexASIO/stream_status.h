@@ -31,7 +31,7 @@ namespace flexasio
     public:
         explicit StreamStatus(StreamStatusDescription description) noexcept : description{ std::move(description) } {}
 
-        const StreamStatusDescription& Description() const noexcept { return description; }
+        [[nodiscard]] constexpr const StreamStatusDescription& Description() const noexcept { return description; }
 
         void NoteGlitches(bool inputOverflow, bool inputUnderflow, bool outputOverflow, bool outputUnderflow) noexcept;
         void NoteSlackFrames(std::int64_t slackFrames) noexcept;
@@ -48,7 +48,7 @@ namespace flexasio
             std::int64_t maxSlackFrames{ 0 };
             bool hasSlack{ false };
         };
-        Snapshot LoadSnapshot() const noexcept;
+        [[nodiscard]] Snapshot LoadSnapshot() const noexcept;
 
     private:
         StreamStatusDescription description;

@@ -8,7 +8,7 @@ namespace flexasio
     class COMInitializer final
     {
     public:
-        COMInitializer(DWORD coInit);
+        explicit COMInitializer(DWORD coInit);
         ~COMInitializer();
 
         COMInitializer(const COMInitializer&) = delete;

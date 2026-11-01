@@ -24,16 +24,20 @@ namespace flexasio
         LogStreamParameters(streamParameters);
         const auto error{ Pa_IsFormatSupported(streamParameters.inputParameters, streamParameters.outputParameters, streamParameters.sampleRate) };
         if (error != paFormatIsSupported)
+        {
             throw std::runtime_error(std::string("PortAudio does not support format: ") + Pa_GetErrorText(error));
+        }
         Log() << "Format is supported";
     }
 
-    void StreamDeleter::operator()(PaStream* stream) throw()
+    void StreamDeleter::operator()(PaStream* stream) noexcept
     {
         Log() << "Closing PortAudio stream " << stream;
         const auto error{ Pa_CloseStream(stream) };
         if (error != paNoError)
+        {
             Log() << "Unable to close PortAudio stream: " << Pa_GetErrorText(error);
+        }
     }
 
     Stream OpenStream(const StreamParameters& streamParameters, unsigned long framesPerBuffer, PaStreamFlags streamFlags, PaStreamCallback* streamCallback, void* userData)
@@ -46,19 +50,25 @@ namespace flexasio
         PaStream* stream{ nullptr };
         const auto error{ Pa_OpenStream(&stream, streamParameters.inputParameters, streamParameters.outputParameters, streamParameters.sampleRate, framesPerBuffer, streamFlags, streamCallback, userData) };
         if (error != paNoError)
+        {
             throw std::runtime_error(std::string("unable to open PortAudio stream: ") + Pa_GetErrorText(error));
+        }
         if (stream == nullptr)
+        {
             throw std::runtime_error("Pa_OpenStream() unexpectedly returned null");
+        }
         Log() << "PortAudio stream opened: " << stream;
         return Stream{ stream };
     }
 
-    void StreamStopper::operator()(PaStream* stream) throw()
+    void StreamStopper::operator()(PaStream* stream) noexcept
     {
         Log() << "Stopping PortAudio stream " << stream;
         const auto error{ Pa_StopStream(stream) };
         if (error != paNoError)
+        {
             Log() << "Unable to stop PortAudio stream: " << Pa_GetErrorText(error);
+        }
     }
 
     ActiveStream StartStream(PaStream* const stream)
@@ -66,7 +76,9 @@ namespace flexasio
         Log() << "Starting PortAudio stream " << stream;
         const auto error{ Pa_StartStream(stream) };
         if (error != paNoError)
+        {
             throw std::runtime_error(std::string("unable to start PortAudio stream: ") + Pa_GetErrorText(error));
+        }
         Log() << "PortAudio stream started";
         return ActiveStream{ stream };
     }

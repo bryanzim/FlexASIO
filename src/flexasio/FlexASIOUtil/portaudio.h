@@ -7,6 +7,7 @@
 
 #include <MMReg.h>
 
+#include <cstddef>
 #include <functional>
 #include <mutex>
 #include <string>
@@ -34,7 +35,7 @@ namespace flexasio
 
         private:
             std::mutex mutex;
-            size_t referenceCount{ 0U };
+            std::size_t referenceCount{ 0U };
             Write* write{ nullptr };
 
             static void DebugPrint(const char*);

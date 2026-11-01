@@ -9,6 +9,9 @@
 #include <dechamps_cpputil/exception.h>
 #include <toml/toml.h>
 
+#include <cstdint>
+#include <cstring>
+
 namespace flexasio
 {
 
@@ -39,7 +42,9 @@ namespace flexasio
                 {
                     const auto parseResult{ toml::parse(stream) };
                     if (!parseResult.valid())
+                    {
                         throw std::runtime_error(parseResult.errorReason);
+                    }
                     return parseResult;
                 }
                 catch (...)
@@ -58,7 +63,9 @@ namespace flexasio
         {
             const auto value{ table.find(key) };
             if (value == table.end())
+            {
                 return;
+            }
             try
             {
                 return functor(value->second);
@@ -103,36 +110,52 @@ namespace flexasio
         void ValidateChannelCount(const int& channelCount)
         {
             if (channelCount <= 0)
+            {
                 throw std::runtime_error("channel count must be strictly positive - to disable a stream direction, set the 'device' option to the empty string \"\" instead");
+            }
         }
 
         void ValidateSuggestedLatency(const double& suggestedLatencySeconds)
         {
-            if (!(suggestedLatencySeconds >= 0 && suggestedLatencySeconds <= 3600))
+            if (!((suggestedLatencySeconds >= 0) && (suggestedLatencySeconds <= 3600)))
+            {
                 throw std::runtime_error("suggested latency must be between 0 and 3600 seconds");
+            }
         }
 
-        void ValidateBufferSize(const int64_t& bufferSizeSamples)
+        void ValidateBufferSize(const std::int64_t& bufferSizeSamples)
         {
             if (bufferSizeSamples <= 0)
+            {
                 throw std::runtime_error("buffer size must be strictly positive");
+            }
             if (bufferSizeSamples >= (std::numeric_limits<long>::max)())
+            {
                 throw std::runtime_error("buffer size is too large");
+            }
         }
 
         void SetStream(const toml::Table& table, Config::Stream& stream)
         {
-            if (table.find("device") != table.end() && table.find("deviceRegex") != table.end())
+            if ((table.find("device") != table.end()) && (table.find("deviceRegex") != table.end()))
+            {
                 throw std::runtime_error("the device and deviceRegex options cannot be specified at the same time");
+            }
             ProcessTypedOption<std::string>(table, "device", [&](const std::string& deviceString) {
                 if (deviceString == "")
+                {
                     stream.device = Config::NoDevice{};
+                }
                 else
+                {
                     stream.device = deviceString;
+                }
             });
             ProcessTypedOption<std::string>(table, "deviceRegex", [&](const std::string& deviceRegexString) {
                 if (deviceRegexString == "")
+                {
                     throw std::runtime_error("the deviceRegex option cannot be empty");
+                }
                 try
                 {
                     stream.device = Config::DeviceRegex{ deviceRegexString };
@@ -189,7 +212,9 @@ namespace flexasio
             void operator()(HANDLE handle)
             {
                 if (::CloseHandle(handle) == 0)
+                {
                     throw std::system_error(::GetLastError(), std::system_category(), "unable to close handle");
+                }
             }
         };
         using UniqueHandle = std::unique_ptr<std::remove_pointer_t<HANDLE>, HandleCloser>;
@@ -198,9 +223,11 @@ namespace flexasio
         {
             OverlappedWithEvent()
             {
-                overlapped.hEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
-                if (overlapped.hEvent == NULL)
+                overlapped.hEvent = CreateEventA(nullptr, TRUE, FALSE, nullptr);
+                if (overlapped.hEvent == nullptr)
+                {
                     throw std::system_error(::GetLastError(), std::system_category(), "Unable to create watch event");
+                }
             }
             ~OverlappedWithEvent()
             {
@@ -229,12 +256,14 @@ namespace flexasio
     {
         Log() << "Stopping config watcher";
         {
-            std::scoped_lock lock{ directoryMutex };
+            const std::scoped_lock lock{ directoryMutex };
             if (directory != INVALID_HANDLE_VALUE)
             {
                 Log() << "Cancelling any pending config directory operations";
-                if (::CancelIoEx(directory, NULL) == 0)
+                if (::CancelIoEx(directory, nullptr) == 0)
+                {
                     throw std::system_error(::GetLastError(), std::system_category(), "Unable to cancel directory watch operation");
+                }
             }
         }
         stopSemaphore.release();
@@ -248,7 +277,9 @@ namespace flexasio
     void ConfigLoader::Watcher::CheckStopRequested(std::chrono::milliseconds waitFor = {})
     {
         if (stopSemaphore.try_acquire_for(waitFor))
+        {
             throw StopRequested();
+        }
     }
 
     void ConfigLoader::Watcher::RunThread()
@@ -297,21 +328,23 @@ namespace flexasio
                 configLoader.configDirectory.wstring().c_str(),
                 FILE_LIST_DIRECTORY,
                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                /*lpSecurityAttributes=*/NULL,
+                /*lpSecurityAttributes=*/nullptr,
                 OPEN_EXISTING,
                 FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
-                /*hTemplateFile=*/NULL);
+                /*hTemplateFile=*/nullptr);
             if (handle == INVALID_HANDLE_VALUE)
+            {
                 throw std::system_error(::GetLastError(), std::system_category(), "Unable to open config directory for watching");
+            }
 
             {
-                std::scoped_lock lock{ directoryMutex };
+                const std::scoped_lock lock{ directoryMutex };
                 assert(directory == INVALID_HANDLE_VALUE);
                 directory = handle;
             }
             const auto directoryDeleter = [&](HANDLE handle) {
                 {
-                    std::scoped_lock lock{ directoryMutex };
+                    const std::scoped_lock lock{ directoryMutex };
                     assert(directory == handle);
                     directory = INVALID_HANDLE_VALUE;
                 }
@@ -346,7 +379,9 @@ namespace flexasio
 					// If for some reason there is enough churn in the directory and we overflow all the time,
 					// this will de facto fall back to polling at intervals given by the debounce period.
 					return true; }, [&](std::span<const std::byte> fileNotifyInformation) { return FileNotifyInformationContainsConfigFileEvents(fileNotifyInformation); }))
+            {
                 break;
+            }
         }
     }
 
@@ -357,11 +392,11 @@ namespace flexasio
             constexpr auto fileNotifyInformationHeaderSize{ offsetof(FILE_NOTIFY_INFORMATION, FileName) };
             FILE_NOTIFY_INFORMATION fileNotifyInformationHeader{};
             const auto fileNotifyInformationHeaderBuffer{ fileNotifyInformationBuffer.first(fileNotifyInformationHeaderSize) };
-            memcpy(&fileNotifyInformationHeader, fileNotifyInformationHeaderBuffer.data(), fileNotifyInformationHeaderBuffer.size());
+            std::memcpy(&fileNotifyInformationHeader, fileNotifyInformationHeaderBuffer.data(), fileNotifyInformationHeaderBuffer.size());
 
             const auto fileNameBuffer{ fileNotifyInformationBuffer.subspan(fileNotifyInformationHeaderSize, fileNotifyInformationHeader.FileNameLength) };
             std::wstring fileName(fileNameBuffer.size() / sizeof(wchar_t), 0);
-            memcpy(fileName.data(), fileNameBuffer.data(), fileNameBuffer.size());
+            std::memcpy(fileName.data(), fileNameBuffer.data(), fileNameBuffer.size());
             if (fileName == configFileName)
             {
                 // Here we can safely log.
@@ -370,10 +405,10 @@ namespace flexasio
                       << " Action = " << fileNotifyInformationHeader.Action
                       << " FileNameLength = " << fileNotifyInformationHeader.FileNameLength;
 
-                if (fileNotifyInformationHeader.Action == FILE_ACTION_ADDED ||
-                    fileNotifyInformationHeader.Action == FILE_ACTION_REMOVED ||
-                    fileNotifyInformationHeader.Action == FILE_ACTION_MODIFIED ||
-                    fileNotifyInformationHeader.Action == FILE_ACTION_RENAMED_NEW_NAME)
+                if ((fileNotifyInformationHeader.Action == FILE_ACTION_ADDED) ||
+                    (fileNotifyInformationHeader.Action == FILE_ACTION_REMOVED) ||
+                    (fileNotifyInformationHeader.Action == FILE_ACTION_MODIFIED) ||
+                    (fileNotifyInformationHeader.Action == FILE_ACTION_RENAMED_NEW_NAME))
                 {
                     Log() << "Detected configuration file change event";
                     return true;
@@ -381,7 +416,9 @@ namespace flexasio
             }
 
             if (fileNotifyInformationHeader.NextEntryOffset == 0U)
+            {
                 break;
+            }
             fileNotifyInformationBuffer = fileNotifyInformationBuffer.subspan(fileNotifyInformationHeader.NextEntryOffset);
         }
         return false;
@@ -393,22 +430,28 @@ namespace flexasio
         assert(reinterpret_cast<std::uintptr_t>(fileNotifyInformationBuffer.data()) % sizeof(DWORD) == 0U);
         if (::ReadDirectoryChangesW(
                 directory,
-                fileNotifyInformationBuffer.data(), DWORD(fileNotifyInformationBuffer.size()),
+                fileNotifyInformationBuffer.data(), static_cast<DWORD>(fileNotifyInformationBuffer.size()),
                 /*bWatchSubtree=*/FALSE,
                 FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE,
-                /*lpBytesReturned=*/NULL,
+                /*lpBytesReturned=*/nullptr,
                 overlapped,
-                /*lpCompletionRoutine=*/NULL) == 0)
+                /*lpCompletionRoutine=*/nullptr) == 0)
+        {
             throw std::system_error(::GetLastError(), std::system_category(), "Unable to watch for directory changes");
+        }
     }
     ConfigLoader::Watcher::ConfigDirectoryWatchOperation::~ConfigDirectoryWatchOperation() noexcept(false)
     {
         if (overlapped == nullptr)
+        {
             return;
+        }
 
         Log() << "Cancelling pending directory watch operation";
         if (::CancelIoEx(directory, overlapped) == 0)
+        {
             throw std::system_error(::GetLastError(), std::system_category(), "Unable to cancel directory watch operation");
+        }
 
         Log() << "Awaiting cancelled operation";
         Await();
@@ -432,7 +475,9 @@ namespace flexasio
             throw std::system_error(::GetLastError(), std::system_category(), "GetOverlappedResult() failed");
         }
         if (size > fileNotifyInformationBuffer.size())
+        {
             throw std::system_error(::GetLastError(), std::system_category(), "ReadDirectoryChangesW() produced invalid size: " + std::to_string(size));
+        }
         return size > 0U ? Outcome{ std::span{ fileNotifyInformationBuffer }.first(size) } : Outcome{ Overflow{} };
     }
 
