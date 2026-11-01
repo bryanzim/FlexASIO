@@ -8,7 +8,9 @@ int main(int argc, char** argv)
 {
     auto* const asioDriver = CreateFlexASIO();
     if (asioDriver == nullptr)
-        abort();
+    {
+        std::abort();
+    }
 
     const auto result = ::ASIOTest_RunTest(asioDriver, argc, argv);
 

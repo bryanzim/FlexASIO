@@ -31,7 +31,9 @@ namespace flexasio
                 path.append("FlexASIO.log");
 
                 if (!std::filesystem::exists(path))
+                {
                     return nullptr;
+                }
 
                 return std::make_unique<FlexASIOLogSink>(path);
             }
@@ -42,7 +44,7 @@ namespace flexasio
                 return output.get();
             }
 
-            FlexASIOLogSink(const std::filesystem::path& path) : file_sink{ path }
+            explicit FlexASIOLogSink(const std::filesystem::path& path) : file_sink{ path }
             {
                 ::dechamps_cpplog::Logger{ this } << "FlexASIO " << BUILD_CONFIGURATION << " " << BUILD_PLATFORM << " " << ::dechamps_CMakeUtils_gitDescriptionDirty << " built on " << ::dechamps_CMakeUtils_buildTime;
             }
@@ -57,7 +59,7 @@ namespace flexasio
 
     }
 
-    bool IsLoggingEnabled() { return FlexASIOLogSink::Get() != nullptr; }
+    [[nodiscard]] bool IsLoggingEnabled() { return FlexASIOLogSink::Get() != nullptr; }
     ::dechamps_cpplog::Logger Log() { return ::dechamps_cpplog::Logger{ FlexASIOLogSink::Get() }; }
 
 }

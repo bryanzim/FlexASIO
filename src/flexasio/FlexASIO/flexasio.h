@@ -12,7 +12,9 @@
 
 #include <windows.h>
 
+#include <array>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <mutex>
 #include <optional>
@@ -26,8 +28,8 @@ namespace flexasio
     {
     public:
         template <typename... Args>
-        ASIOException(ASIOError asioError, Args&&... args) : std::runtime_error{ std::forward<Args>(args)... }, asioError{ asioError } {}
-        ASIOError GetASIOError() const { return asioError; }
+        explicit ASIOException(ASIOError asioError, Args&&... args) : std::runtime_error{ std::forward<Args>(args)... }, asioError{ asioError } {}
+        [[nodiscard]] constexpr ASIOError GetASIOError() const noexcept { return asioError; }
 
     private:
         ASIOError asioError;
@@ -36,12 +38,12 @@ namespace flexasio
     class FlexASIO final
     {
     public:
-        FlexASIO(void* sysHandle);
+        explicit FlexASIO(void* sysHandle);
 
         void GetBufferSize(long* minSize, long* maxSize, long* preferredSize, long* granularity);
         void GetChannels(long* numInputChannels, long* numOutputChannels);
         void GetChannelInfo(ASIOChannelInfo* info);
-        bool CanSampleRate(ASIOSampleRate sampleRate);
+        [[nodiscard]] bool CanSampleRate(ASIOSampleRate sampleRate);
         void SetSampleRate(ASIOSampleRate requestedSampleRate);
         void GetSampleRate(ASIOSampleRate* sampleRateResult);
 
@@ -61,7 +63,7 @@ namespace flexasio
         {
             ASIOSampleType asio;
             PaSampleFormat pa;
-            size_t size;
+            std::size_t size;
             GUID waveSubFormat;
         };
 
@@ -74,7 +76,7 @@ namespace flexasio
         class PortAudioHandle
         {
         public:
-            PortAudioHandle();
+            explicit PortAudioHandle();
             PortAudioHandle(const PortAudioHandle&) = delete;
             PortAudioHandle(const PortAudioHandle&&) = delete;
             ~PortAudioHandle();
@@ -83,11 +85,11 @@ namespace flexasio
         class Win32HighResolutionTimer
         {
         public:
-            Win32HighResolutionTimer();
+            explicit Win32HighResolutionTimer();
             Win32HighResolutionTimer(const Win32HighResolutionTimer&) = delete;
             Win32HighResolutionTimer(Win32HighResolutionTimer&&) = delete;
             ~Win32HighResolutionTimer();
-            DWORD GetTimeMilliseconds() const;
+            [[nodiscard]] DWORD GetTimeMilliseconds() const noexcept;
         };
 
         class PreparedState
@@ -97,9 +99,9 @@ namespace flexasio
             PreparedState(const PreparedState&) = delete;
             PreparedState(PreparedState&&) = delete;
 
-            StreamExclusivity GetStreamExclusivity() const { return streamWithExclusivity.exclusivity; }
+            [[nodiscard]] constexpr StreamExclusivity GetStreamExclusivity() const noexcept { return streamWithExclusivity.exclusivity; }
 
-            bool IsChannelActive(bool isInput, long channel) const;
+            [[nodiscard]] bool IsChannelActive(bool isInput, long channel) const noexcept;
 
             void GetLatencies(long* inputLatency, long* outputLatency);
             void Start();
@@ -108,35 +110,39 @@ namespace flexasio
             void GetSamplePosition(ASIOSamples* sPos, ASIOTimeStamp* tStamp);
             void OutputReady();
 
-            void RequestReset();
+            void RequestReset() const;
 
         private:
             struct Buffers
             {
-                Buffers(size_t bufferSetCount, size_t inputChannelCount, size_t outputChannelCount, size_t bufferSizeInFrames, size_t inputSampleSizeInBytes, size_t outputSampleSizeInBytes);
+                Buffers(std::size_t bufferSetCount, std::size_t inputChannelCount, std::size_t outputChannelCount, std::size_t bufferSizeInFrames, std::size_t inputSampleSizeInBytes, std::size_t outputSampleSizeInBytes);
                 ~Buffers();
-                std::byte* GetInputBuffer(size_t bufferSetIndex, size_t channelIndex) { return buffers.data() + bufferSetIndex * GetBufferSetSizeInBytes() + channelIndex * GetInputBufferSizeInBytes(); }
-                std::byte* GetOutputBuffer(size_t bufferSetIndex, size_t channelIndex) { return GetInputBuffer(bufferSetIndex, inputChannelCount) + channelIndex * GetOutputBufferSizeInBytes(); }
-                size_t GetBufferSetSizeInBytes() const { return buffers.size() / bufferSetCount; }
-                size_t GetInputBufferSizeInBytes() const
+                [[nodiscard]] std::byte* GetInputBuffer(std::size_t bufferSetIndex, std::size_t channelIndex) noexcept { return buffers.data() + bufferSetIndex * GetBufferSetSizeInBytes() + channelIndex * GetInputBufferSizeInBytes(); }
+                [[nodiscard]] std::byte* GetOutputBuffer(std::size_t bufferSetIndex, std::size_t channelIndex) noexcept { return GetInputBuffer(bufferSetIndex, inputChannelCount) + channelIndex * GetOutputBufferSizeInBytes(); }
+                [[nodiscard]] constexpr std::size_t GetBufferSetSizeInBytes() const noexcept { return buffers.size() / bufferSetCount; }
+                [[nodiscard]] constexpr std::size_t GetInputBufferSizeInBytes() const noexcept
                 {
                     if (buffers.empty())
+                    {
                         return 0U;
+                    }
                     return bufferSizeInFrames * inputSampleSizeInBytes;
                 }
-                size_t GetOutputBufferSizeInBytes() const
+                [[nodiscard]] constexpr std::size_t GetOutputBufferSizeInBytes() const noexcept
                 {
                     if (buffers.empty())
+                    {
                         return 0U;
+                    }
                     return bufferSizeInFrames * outputSampleSizeInBytes;
                 }
 
-                const size_t bufferSetCount;
-                const size_t inputChannelCount;
-                const size_t outputChannelCount;
-                const size_t bufferSizeInFrames;
-                const size_t inputSampleSizeInBytes;
-                const size_t outputSampleSizeInBytes;
+                const std::size_t bufferSetCount;
+                const std::size_t inputChannelCount;
+                const std::size_t outputChannelCount;
+                const std::size_t bufferSizeInFrames;
+                const std::size_t inputSampleSizeInBytes;
+                const std::size_t outputSampleSizeInBytes;
 
                 // This is a giant buffer containing all ASIO buffers. It is organized as follows:
                 // [ input channel 0 buffer 0 ] [ input channel 1 buffer 0 ] ... [ input channel N buffer 0 ] [ output channel 0 buffer 0 ] [ output channel 1 buffer 0 ] .. [ output channel N buffer 0 ]
@@ -148,7 +154,7 @@ namespace flexasio
             class RunningState
             {
             public:
-                RunningState(PreparedState& preparedState);
+                explicit RunningState(PreparedState& preparedState);
                 ~RunningState();
 
                 // Note: the reason why this is not done in the constructor is to allow `PreparedState::Start()`
@@ -163,7 +169,7 @@ namespace flexasio
 
                 PaStreamCallbackResult StreamCallback(const void* input, void* output, unsigned long frameCount, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags);
                 void NoteStreamStatus(PaStreamCallbackFlags statusFlags) noexcept;
-                std::int64_t TicksToFrames(std::int64_t ticks) const noexcept;
+                [[nodiscard]] std::int64_t TicksToFrames(std::int64_t ticks) const noexcept;
 
             private:
                 enum class State
@@ -204,10 +210,10 @@ namespace flexasio
                 ActiveStream activeStream;
             };
 
-            static int StreamCallback(const void* input, void* output, unsigned long frameCount, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void* userData) throw();
+            static int StreamCallback(const void* input, void* output, unsigned long frameCount, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void* userData) noexcept;
 
             void OnConfigChange();
-            StreamStatusDescription MakeStreamStatusDescription() const;
+            [[nodiscard]] StreamStatusDescription MakeStreamStatusDescription() const;
 
             FlexASIO& flexASIO;
             const ASIOSampleRate sampleRate;
@@ -234,15 +240,15 @@ namespace flexasio
         static const SampleType int32;
         static const SampleType int24;
         static const SampleType int16;
-        static const std::pair<std::string_view, SampleType> sampleTypes[];
+        static const std::array<std::pair<std::string_view, SampleType>, 4U> sampleTypes;
         static SampleType ParseSampleType(std::string_view str);
         static SampleType WaveFormatToSampleType(const WAVEFORMATEXTENSIBLE& waveFormat);
         static SampleType SelectSampleType(PaHostApiTypeId hostApiTypeId, const Device& device, const Config::Stream& streamConfig);
         static std::string DescribeSampleType(const SampleType&);
         static DWORD SelectChannelMask(PaHostApiTypeId hostApiTypeId, const Device& device, const Config::Stream& streamConfig);
 
-        int GetInputChannelCount() const;
-        int GetOutputChannelCount() const;
+        [[nodiscard]] int GetInputChannelCount() const noexcept;
+        [[nodiscard]] int GetOutputChannelCount() const noexcept;
 
         struct BufferSizes
         {
@@ -251,10 +257,10 @@ namespace flexasio
             long preferred;
             long granularity;
         };
-        BufferSizes ComputeBufferSizes() const;
+        [[nodiscard]] BufferSizes ComputeBufferSizes() const;
 
-        long ComputeLatency(long latencyInFrames, bool output, size_t bufferSizeInFrames) const;
-        long ComputeLatencyFromStream(PaStream* stream, bool output, size_t bufferSizeInFrames) const;
+        long ComputeLatency(long latencyInFrames, bool output, std::size_t bufferSizeInFrames) const;
+        long ComputeLatencyFromStream(PaStream* stream, bool output, std::size_t bufferSizeInFrames) const;
 
         template <typename Functor>
         decltype(auto) WithStreamParameters(bool inputEnabled, bool outputEnabled, double sampleRate, PaTime suggestedLatency, Functor functor) const;

@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <mutex>
@@ -22,20 +23,20 @@ namespace flexasio
     {
         struct DefaultDevice final
         {
-            bool operator==(const DefaultDevice&) const { return true; }
+            [[nodiscard]] constexpr bool operator==(const DefaultDevice&) const noexcept { return true; }
         };
         struct NoDevice final
         {
-            bool operator==(const NoDevice&) const { return true; }
+            [[nodiscard]] constexpr bool operator==(const NoDevice&) const noexcept { return true; }
         };
         struct DeviceRegex final
         {
-            DeviceRegex(std::string string) : string{ std::move(string) }, regex{ this->string } {}
+            explicit DeviceRegex(std::string string) : string{ std::move(string) }, regex{ this->string } {}
 
-            const std::string& getString() const { return string; }
-            const std::regex& getRegex() const { return regex; }
+            [[nodiscard]] const std::string& getString() const { return string; }
+            [[nodiscard]] const std::regex& getRegex() const { return regex; }
 
-            bool operator==(const DeviceRegex& other) const { return string == other.string; }
+            [[nodiscard]] constexpr bool operator==(const DeviceRegex& other) const noexcept { return string == other.string; }
 
         private:
             std::string string;
@@ -44,7 +45,7 @@ namespace flexasio
         using Device = std::variant<DefaultDevice, NoDevice, std::string, DeviceRegex>;
 
         std::optional<std::string> backend;
-        std::optional<int64_t> bufferSizeSamples;
+        std::optional<std::int64_t> bufferSizeSamples;
 
         struct Stream
         {
@@ -56,35 +57,35 @@ namespace flexasio
             bool wasapiAutoConvert{ true };
             bool wasapiExplicitSampleFormat{ true };
 
-            bool operator==(const Stream& other) const
+            [[nodiscard]] constexpr bool operator==(const Stream& other) const noexcept
             {
-                return device == other.device &&
-                       channels == other.channels &&
-                       sampleType == other.sampleType &&
-                       suggestedLatencySeconds == other.suggestedLatencySeconds &&
-                       wasapiExclusiveMode == other.wasapiExclusiveMode &&
-                       wasapiAutoConvert == other.wasapiAutoConvert &&
-                       wasapiExplicitSampleFormat == other.wasapiExplicitSampleFormat;
+                return (device == other.device) &&
+                       (channels == other.channels) &&
+                       (sampleType == other.sampleType) &&
+                       (suggestedLatencySeconds == other.suggestedLatencySeconds) &&
+                       (wasapiExclusiveMode == other.wasapiExclusiveMode) &&
+                       (wasapiAutoConvert == other.wasapiAutoConvert) &&
+                       (wasapiExplicitSampleFormat == other.wasapiExplicitSampleFormat);
             }
         };
         Stream input;
         Stream output;
 
-        bool operator==(const Config& other) const
+        [[nodiscard]] constexpr bool operator==(const Config& other) const noexcept
         {
-            return backend == other.backend &&
-                   bufferSizeSamples == other.bufferSizeSamples &&
-                   input == other.input &&
-                   output == other.output;
+            return (backend == other.backend) &&
+                   (bufferSizeSamples == other.bufferSizeSamples) &&
+                   (input == other.input) &&
+                   (output == other.output);
         }
     };
 
     class ConfigLoader
     {
     public:
-        ConfigLoader();
+        explicit ConfigLoader();
 
-        const Config& Initial() const { return initialConfig; }
+        [[nodiscard]] constexpr const Config& Initial() const noexcept { return initialConfig; }
 
         class Watcher
         {

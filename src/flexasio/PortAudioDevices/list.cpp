@@ -22,7 +22,9 @@ namespace flexasio
         auto ThrowOnPaError(Result result)
         {
             if (result >= 0)
+            {
                 return result;
+            }
             throw std::runtime_error(std::string("PortAudio error ") + Pa_GetErrorText(result));
         }
 
@@ -39,17 +41,23 @@ namespace flexasio
             // _setmode(), _O_U8TEXT, and sticking to wide character I/O seems to produce the "least broken" results.
             // One thing that seems to always be broken no matter what is when using "> file.txt" in Powershell, which results in some garbage UTF-8-in-UTF-16 abomination (cmd.exe is fine, though).
             if (_setmode(fileno, _O_U8TEXT) < 0)
+            {
                 std::wcerr << "Warning: cannot set " << label << " to UTF-8";
+            }
         }
 
         std::wstring UTF8ToWideString(std::string_view utf8)
         {
-            const auto size{ MultiByteToWideChar(CP_UTF8, 0U, utf8.data(), int(utf8.size()), NULL, 0) };
+            const auto size{ MultiByteToWideChar(CP_UTF8, 0U, utf8.data(), static_cast<int>(utf8.size()), nullptr, 0) };
             if (size == 0)
+            {
                 throw std::runtime_error("Unable to convert UTF-8 string");
+            }
             std::wstring result(size, 0);
-            if (MultiByteToWideChar(CP_UTF8, 0U, utf8.data(), int(utf8.size()), result.data(), int(result.size())) == 0)
+            if (MultiByteToWideChar(CP_UTF8, 0U, utf8.data(), static_cast<int>(utf8.size()), result.data(), static_cast<int>(result.size())) == 0)
+            {
                 throw std::runtime_error("Unable to convert UTF-8 string");
+            }
             return result;
         }
 
@@ -59,7 +67,9 @@ namespace flexasio
 
             const auto device{ Pa_GetDeviceInfo(deviceIndex) };
             if (device == nullptr)
+            {
                 throw std::runtime_error("Pa_GetDeviceInfo() returned NULL");
+            }
 
             std::wcout << "Device name: \"" << UTF8ToWideString(device->name) << "\"" << std::endl;
             std::wcout << "Default sample rate: " << device->defaultSampleRate << std::endl;
@@ -67,10 +77,14 @@ namespace flexasio
             std::wcout << "Output: max channel count " << device->maxOutputChannels << ", default latency " << device->defaultLowOutputLatency << "s (low) " << device->defaultHighOutputLatency << "s (high)" << std::endl;
 
             if (device->hostApi < 0)
+            {
                 throw std::runtime_error("invalid hostApi index");
+            }
             const auto hostApi{ Pa_GetHostApiInfo(device->hostApi) };
             if (hostApi == nullptr)
+            {
                 throw std::runtime_error("Pa_GetHostApiInfo() returned NULL");
+            }
 
             std::wcout << "Host API name: " << hostApi->name << std::endl;
             std::wcout << "Host API type: " << UTF8ToWideString(GetHostApiTypeIdString(hostApi->type)) << std::endl;
@@ -117,7 +131,7 @@ namespace flexasio
             SetUTF8Mode(stderr, L"standard error");
             SetUTF8Mode(stdout, L"standard output");
 
-            PortAudioDebugRedirector portAudioLogger{ [](std::string_view str) { std::wcerr << "[PortAudio] " << UTF8ToWideString(str) << std::endl; } };
+            const PortAudioDebugRedirector portAudioLogger{ [](std::string_view str) { std::wcerr << "[PortAudio] " << UTF8ToWideString(str) << std::endl; } };
 
             try
             {
